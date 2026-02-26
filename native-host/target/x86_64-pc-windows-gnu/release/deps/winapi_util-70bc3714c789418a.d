@@ -1,0 +1,11 @@
+/home/hase/P-Manager/native-host/target/x86_64-pc-windows-gnu/release/deps/winapi_util-70bc3714c789418a.d: /home/hase/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/winapi-util-0.1.11/src/lib.rs /home/hase/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/winapi-util-0.1.11/src/console.rs /home/hase/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/winapi-util-0.1.11/src/file.rs /home/hase/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/winapi-util-0.1.11/src/sysinfo.rs /home/hase/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/winapi-util-0.1.11/src/win.rs
+
+/home/hase/P-Manager/native-host/target/x86_64-pc-windows-gnu/release/deps/libwinapi_util-70bc3714c789418a.rlib: /home/hase/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/winapi-util-0.1.11/src/lib.rs /home/hase/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/winapi-util-0.1.11/src/console.rs /home/hase/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/winapi-util-0.1.11/src/file.rs /home/hase/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/winapi-util-0.1.11/src/sysinfo.rs /home/hase/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/winapi-util-0.1.11/src/win.rs
+
+/home/hase/P-Manager/native-host/target/x86_64-pc-windows-gnu/release/deps/libwinapi_util-70bc3714c789418a.rmeta: /home/hase/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/winapi-util-0.1.11/src/lib.rs /home/hase/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/winapi-util-0.1.11/src/console.rs /home/hase/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/winapi-util-0.1.11/src/file.rs /home/hase/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/winapi-util-0.1.11/src/sysinfo.rs /home/hase/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/winapi-util-0.1.11/src/win.rs
+
+/home/hase/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/winapi-util-0.1.11/src/lib.rs:
+/home/hase/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/winapi-util-0.1.11/src/console.rs:
+/home/hase/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/winapi-util-0.1.11/src/file.rs:
+/home/hase/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/winapi-util-0.1.11/src/sysinfo.rs:
+/home/hase/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/winapi-util-0.1.11/src/win.rs:

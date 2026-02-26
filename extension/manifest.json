@@ -1,0 +1,38 @@
+{
+  "manifest_version": 3,
+  "name": "p-manager",
+  "version": "1.0",
+  "description": "p-manager",
+
+  "permissions": [
+    "storage",
+    "activeTab",
+    "scripting",
+    "contextMenus",
+    "nativeMessaging",
+    "tabs",
+    "pageCapture"
+  ],
+
+  "host_permissions":["<all_urls>"],
+
+  "background": {
+    "service_worker": "dist/background/background.js",
+    "type": "module"
+  },
+
+  "action":{
+
+  },
+
+
+  "content_scripts": [
+    {
+      "matches": [
+        "<all_urls>"
+      ],
+      "js": ["dist/content/content.js"]
+    }
+  ]
+}
+
