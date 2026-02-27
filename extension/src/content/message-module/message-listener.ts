@@ -21,10 +21,13 @@ export class MessageListener{
       }
 
       if((request as any).kind==="MESSAGE_OPEN_PROFILE"){
-        this.activeThread?.initMatchInfo();
+        this.activeThread?.initMatchProfile(0);
         return;
       }
-      if((request as any).kind!=="MESSAGE_START_OBSERVE")return;
+      if(
+        (request as any).kind!=="MESSAGE_START_OBSERVE"&&
+        (request as any).kind!=="MESSAGE_OPEN_PROFILE"
+      )return;
       console.log("start message thread");
       const url=request.url;
       const title=request.title;

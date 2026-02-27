@@ -8,6 +8,7 @@ export interface ThreadMessage{
 export interface MatchInfo{
   name: string;
   age: string;
+  selfIntroduction?: string;
   height?: string;
   figure?: string;
   bloodType?: string;
@@ -43,6 +44,8 @@ export interface ThreadSelectors{
   messageText: string;
   matchInfo: string;
   matchInfoRoot?: string;
+  selfIntroduction: string;
+  matchName: string;
 
   messageIdAttr?: string;
   timeText?: string;
@@ -56,8 +59,11 @@ export const defaultSelectors: ThreadSelectors = {
   messageItem: 'li[data-test^="message-sent-time-"]',
   messageText: ".css-m2d5md",
   messageIdAttr: "data-test",
+  matchName: '[data-test="header-title"] .css-8n7an',
   matchInfo: ".css-1yx6rxm",
+  selfIntroduction: ".css-1x1bqz1",
   matchInfoRoot: "#dialog-root",
+  mineClass: "css-1y1ka7w",
 }
 
 function safeText(el: Element | null):string{
@@ -66,6 +72,31 @@ function safeText(el: Element | null):string{
 
 function normalizeAge(value: string): string {
   return value.replace(/歳$/, "").trim();
+}
+
+function findProfileByHeading(root: ParentNode): Element | null {
+  const headings = Array.from(root.querySelectorAll("h2"));
+  for (const h2 of headings) {
+    if (safeText(h2) !== "プロフィール") continue;
+    const container = h2.closest("div");
+    if (!container) continue;
+    if (container.querySelector("dt") && container.querySelector("dd")) {
+      return container;
+    }
+  }
+  return null;
+}
+
+function extractSelfIntroductionText(container: Element | null): string {
+  if (!container) return "";
+
+  const p =
+    container.querySelector("p.css-1ryh3zs") ??
+    container.querySelector("p");
+  const pText = safeText(p);
+  if (pText) return pText;
+
+  return safeText(container);
 }
 
 function parseSectionMD(item: Element): { month: number; day: number } | null {
@@ -128,7 +159,13 @@ function isMine(item: Element, sel: ThreadSelectors): boolean {
     return v === sel.mineAttr.value;
   }
   if (sel.mineClass) {
-    return item.classList.contains(sel.mineClass);
+    const cls = sel.mineClass.startsWith(".")
+      ? sel.mineClass
+      : `.${sel.mineClass}`;
+
+    // messageItem(li) ではなく、その子要素に自分側のクラスが付くケースを許容する
+    if (item.matches(cls)) return true;
+    return item.querySelector(cls) != null;
   }
   return false;
 }
@@ -160,6 +197,7 @@ export class MessageThread{
   private threadItems: ThreadMessage[]=[];
   private seenIds=new Set<string>();
   private matchInfo: MatchInfo | null=null;
+  private matchName: string | null=null;
 
   constructor(
     readonly id:string, 
@@ -195,6 +233,7 @@ export class MessageThread{
 
     // 会話内容の取得
     this.initThreadItems(targetNode);
+    this.initMatchName(targetNode,0);
     
     this.observer?.disconnect();
     this.observer = new MutationObserver(this.handleMutations);
@@ -228,11 +267,33 @@ export class MessageThread{
 
     console.log("threadItems: ",this.threadItems);
   }
+  
+  private initMatchName(container: HTMLElement,attribute: number){
+    const selector = this.selectors.matchName.startsWith(".")
+      || this.selectors.matchName.startsWith("#")
+      || this.selectors.matchName.includes("[")
+      || this.selectors.matchName.includes(" ")
+      ? this.selectors.matchName
+      : `.${this.selectors.matchName}`;
 
-  initMatchInfo(){
+    const item=container.querySelector(selector) ?? document.querySelector(selector);
+    const name=safeText(item);
+    if(!name){
+      console.log("failed to find name, attribute=",attribute);
+      setTimeout(()=>this.initMatchName(container,attribute+1),1000);
+      return;
+    }
+
+    this.matchName=name;
+    console.log("matchName: ", this.matchName);
+  }
+
+  initMatchProfile(attribute:number){
+    if(attribute>2)return;
     const container=this.getThreadContainer();
+    console.log("start init match info");
     if(!container){
-      setTimeout(()=>this.initPageObserver(),5000);
+      setTimeout(()=>this.initMatchProfile(attribute+1),1000);
       return;
     }
 
@@ -244,16 +305,31 @@ export class MessageThread{
     rootCandidates.push(container);
     rootCandidates.push(document);
 
+    // self introduction
+    let selfIntroductionEl: Element | null=null;
+    for (const root of rootCandidates){
+      const found=
+        root.querySelector(this.selectors.selfIntroduction);
+      if(found){
+        selfIntroductionEl=found;
+        break;
+      }
+    }
+
     let matchProfile: Element | null = null;
     for (const root of rootCandidates) {
-      const found = root.querySelector(this.selectors.matchInfo);
+      const found =
+        root.querySelector(this.selectors.matchInfo) ??
+        findProfileByHeading(root);
       if (found) {
         matchProfile = found;
         break;
       }
     }
+    // DOMが反映されていない場合はもう一度
     if(!matchProfile) {
       console.log("failed to capture profile");
+      setTimeout(()=>this.initMatchProfile(attribute+1),1000);
       return;
     }
 
@@ -269,8 +345,9 @@ export class MessageThread{
     }
 
     this.matchInfo={
-      name: kv["ニックネーム"] ?? this.title,
+      name: kv["ニックネーム"] ?? this.matchName ?? this.title,
       age: normalizeAge(kv["年齢"] ?? ""),
+      selfIntroduction: extractSelfIntroductionText(selfIntroductionEl),
       height: kv["身長"],
       figure: kv["体型"],
       residence: kv["居住地"],
@@ -298,6 +375,11 @@ export class MessageThread{
       costOfDate: kv["デート費用"],
     };
     console.log("matchInfo: ",this.matchInfo);
+  }
+
+  // backward compatibility
+  initMatchInfo(attribute:number){
+    this.initMatchProfile(attribute);
   }
 
   private parseMessageItem(item: Element):ThreadMessage | null{
@@ -344,10 +426,6 @@ export class MessageThread{
           this.threadItems.push(msg);
         }
       }
-    }
-    if(!this.matchInfo){
-      const container=this.getThreadContainer();
-      if(container)this.initMatchInfo(container);
     }
     console.log("threadItems: ",this.threadItems);
   }

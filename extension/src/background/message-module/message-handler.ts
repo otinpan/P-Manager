@@ -19,8 +19,12 @@ export class MessageHandler extends Handler{
 
       this.setEnabled(true);
 
+      const kind =
+        ev.command === COMMANDS.MESSAGE_OPEN
+          ? "MESSAGE_START_OBSERVE"
+          : "MESSAGE_OPEN_PROFILE"; 
       chrome.tabs.sendMessage(ev.tabId,{
-        kind: "MESSAGE_START_OBSERVE",
+        kind,
         url: ev.url,
         title: ev.title ?? "",
         isPartner: ev.command===COMMANDS.PARTNER_OPEN,

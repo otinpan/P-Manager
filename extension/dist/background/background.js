@@ -55,10 +55,8 @@ var init_generic_listener = __esm({
           let command = "otherOpen" /* OTHER_OPEN */;
           if (url.includes("pairs.lv/message/detail") && url.includes("/partner/")) {
             command = "partnerOpen" /* PARTNER_OPEN */;
-            console.log("partner profile page");
           } else if (url.includes("pairs.lv/message/detail")) {
             command = "messageOpen" /* MESSAGE_OPEN */;
-            console.log("message page");
           } else if (url.includes("pairs.lv/other")) {
             command = "profileOpen" /* PROFILE_OPEN */;
           }
@@ -125,8 +123,9 @@ var init_message_handler = __esm({
           console.log(ev.command === "partnerOpen" /* PARTNER_OPEN */ ? "partner page" : "message page");
           if (!ev.url) return;
           this.setEnabled(true);
+          const kind = ev.command === "messageOpen" /* MESSAGE_OPEN */ ? "MESSAGE_START_OBSERVE" : "MESSAGE_OPEN_PROFILE";
           chrome.tabs.sendMessage(ev.tabId, {
-            kind: "MESSAGE_START_OBSERVE",
+            kind,
             url: ev.url,
             title: ev.title ?? "",
             isPartner: ev.command === "partnerOpen" /* PARTNER_OPEN */

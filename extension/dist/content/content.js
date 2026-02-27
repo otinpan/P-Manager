@@ -15,6 +15,25 @@
   function normalizeAge(value) {
     return value.replace(/歳$/, "").trim();
   }
+  function findProfileByHeading(root) {
+    const headings = Array.from(root.querySelectorAll("h2"));
+    for (const h2 of headings) {
+      if (safeText(h2) !== "\u30D7\u30ED\u30D5\u30A3\u30FC\u30EB") continue;
+      const container = h2.closest("div");
+      if (!container) continue;
+      if (container.querySelector("dt") && container.querySelector("dd")) {
+        return container;
+      }
+    }
+    return null;
+  }
+  function extractSelfIntroductionText(container) {
+    if (!container) return "";
+    const p = container.querySelector("p.css-1ryh3zs") ?? container.querySelector("p");
+    const pText = safeText(p);
+    if (pText) return pText;
+    return safeText(container);
+  }
   function parseSectionMD(item) {
     const section = item.closest("section");
     if (!section) return null;
@@ -59,7 +78,9 @@
       return v === sel.mineAttr.value;
     }
     if (sel.mineClass) {
-      return item.classList.contains(sel.mineClass);
+      const cls = sel.mineClass.startsWith(".") ? sel.mineClass : `.${sel.mineClass}`;
+      if (item.matches(cls)) return true;
+      return item.querySelector(cls) != null;
     }
     return false;
   }
@@ -86,8 +107,11 @@
         messageItem: 'li[data-test^="message-sent-time-"]',
         messageText: ".css-m2d5md",
         messageIdAttr: "data-test",
+        matchName: '[data-test="header-title"] .css-8n7an',
         matchInfo: ".css-1yx6rxm",
-        matchInfoRoot: "#dialog-root"
+        selfIntroduction: ".css-1x1bqz1",
+        matchInfoRoot: "#dialog-root",
+        mineClass: "css-1y1ka7w"
       };
       MessageThread = class {
         constructor(id, title, selectors = defaultSelectors) {
@@ -98,6 +122,7 @@
           this.threadItems = [];
           this.seenIds = /* @__PURE__ */ new Set();
           this.matchInfo = null;
+          this.matchName = null;
           this.handleMutations = (mutations) => {
             for (const m of mutations) {
               for (const node of Array.from(m.addedNodes)) {
@@ -113,10 +138,6 @@
                   this.threadItems.push(msg);
                 }
               }
-            }
-            if (!this.matchInfo) {
-              const container = this.getThreadContainer();
-              if (container) this.initMatchInfo(container);
             }
             console.log("threadItems: ", this.threadItems);
           };
@@ -141,6 +162,7 @@
           }
           targetNode.dataset.threadId = this.id;
           this.initThreadItems(targetNode);
+          this.initMatchName(targetNode, 0);
           this.observer?.disconnect();
           this.observer = new MutationObserver(this.handleMutations);
           this.observer.observe(targetNode, { childList: true, subtree: true });
@@ -168,10 +190,24 @@
           }
           console.log("threadItems: ", this.threadItems);
         }
-        initMatchInfo() {
+        initMatchName(container, attribute) {
+          const selector = this.selectors.matchName.startsWith(".") || this.selectors.matchName.startsWith("#") || this.selectors.matchName.includes("[") || this.selectors.matchName.includes(" ") ? this.selectors.matchName : `.${this.selectors.matchName}`;
+          const item = container.querySelector(selector) ?? document.querySelector(selector);
+          const name = safeText(item);
+          if (!name) {
+            console.log("failed to find name, attribute=", attribute);
+            setTimeout(() => this.initMatchName(container, attribute + 1), 1e3);
+            return;
+          }
+          this.matchName = name;
+          console.log("matchName: ", this.matchName);
+        }
+        initMatchProfile(attribute) {
+          if (attribute > 2) return;
           const container = this.getThreadContainer();
+          console.log("start init match info");
           if (!container) {
-            setTimeout(() => this.initPageObserver(), 5e3);
+            setTimeout(() => this.initMatchProfile(attribute + 1), 1e3);
             return;
           }
           const rootCandidates = [];
@@ -181,9 +217,17 @@
           }
           rootCandidates.push(container);
           rootCandidates.push(document);
+          let selfIntroductionEl = null;
+          for (const root of rootCandidates) {
+            const found = root.querySelector(this.selectors.selfIntroduction);
+            if (found) {
+              selfIntroductionEl = found;
+              break;
+            }
+          }
           let matchProfile = null;
           for (const root of rootCandidates) {
-            const found = root.querySelector(this.selectors.matchInfo);
+            const found = root.querySelector(this.selectors.matchInfo) ?? findProfileByHeading(root);
             if (found) {
               matchProfile = found;
               break;
@@ -191,6 +235,7 @@
           }
           if (!matchProfile) {
             console.log("failed to capture profile");
+            setTimeout(() => this.initMatchProfile(attribute + 1), 1e3);
             return;
           }
           const rows = Array.from(matchProfile.querySelectorAll("dt"));
@@ -204,8 +249,9 @@
             kv[key] = value;
           }
           this.matchInfo = {
-            name: kv["\u30CB\u30C3\u30AF\u30CD\u30FC\u30E0"] ?? this.title,
+            name: kv["\u30CB\u30C3\u30AF\u30CD\u30FC\u30E0"] ?? this.matchName ?? this.title,
             age: normalizeAge(kv["\u5E74\u9F62"] ?? ""),
+            selfIntroduction: extractSelfIntroductionText(selfIntroductionEl),
             height: kv["\u8EAB\u9577"],
             figure: kv["\u4F53\u578B"],
             residence: kv["\u5C45\u4F4F\u5730"],
@@ -233,6 +279,10 @@
             costOfDate: kv["\u30C7\u30FC\u30C8\u8CBB\u7528"]
           };
           console.log("matchInfo: ", this.matchInfo);
+        }
+        // backward compatibility
+        initMatchInfo(attribute) {
+          this.initMatchProfile(attribute);
         }
         parseMessageItem(item) {
           const textEl = item.querySelector(this.selectors.messageText);
@@ -282,10 +332,10 @@
               return;
             }
             if (request.kind === "MESSAGE_OPEN_PROFILE") {
-              this.activeThread?.initMatchInfo();
+              this.activeThread?.initMatchProfile(0);
               return;
             }
-            if (request.kind !== "MESSAGE_START_OBSERVE") return;
+            if (request.kind !== "MESSAGE_START_OBSERVE" && request.kind !== "MESSAGE_OPEN_PROFILE") return;
             console.log("start message thread");
             const url = request.url;
             const title = request.title;

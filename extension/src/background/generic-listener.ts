@@ -44,10 +44,8 @@ export class GenericListener{
       let command:COMMANDS=COMMANDS.OTHER_OPEN;
       if(url.includes("pairs.lv/message/detail")&&url.includes("/partner/")){
         command=COMMANDS.PARTNER_OPEN;
-        console.log("partner profile page");
       }else if(url.includes("pairs.lv/message/detail")){
         command=COMMANDS.MESSAGE_OPEN;
-        console.log("message page");
       }else if(url.includes("pairs.lv/other")){
         command=COMMANDS.PROFILE_OPEN;
       }
