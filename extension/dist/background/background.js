@@ -57,7 +57,7 @@ var init_generic_listener = __esm({
             command = "partnerOpen" /* PARTNER_OPEN */;
           } else if (url.includes("pairs.lv/message/detail")) {
             command = "messageOpen" /* MESSAGE_OPEN */;
-          } else if (url.includes("pairs.lv/other")) {
+          } else if (url.includes("pairs.lv/myprofile")) {
             command = "profileOpen" /* PROFILE_OPEN */;
           }
           this.emit({ command, tabId, url, title: tab.title });

@@ -190,24 +190,24 @@
           }
           console.log("threadItems: ", this.threadItems);
         }
-        initMatchName(container, attribute) {
+        initMatchName(container, attempt) {
           const selector = this.selectors.matchName.startsWith(".") || this.selectors.matchName.startsWith("#") || this.selectors.matchName.includes("[") || this.selectors.matchName.includes(" ") ? this.selectors.matchName : `.${this.selectors.matchName}`;
           const item = container.querySelector(selector) ?? document.querySelector(selector);
           const name = safeText(item);
           if (!name) {
-            console.log("failed to find name, attribute=", attribute);
-            setTimeout(() => this.initMatchName(container, attribute + 1), 1e3);
+            console.log("failed to find name, attempt=", attempt);
+            setTimeout(() => this.initMatchName(container, attempt + 1), 1e3);
             return;
           }
           this.matchName = name;
           console.log("matchName: ", this.matchName);
         }
-        initMatchProfile(attribute) {
-          if (attribute > 2) return;
+        initMatchProfile(attempt) {
+          if (attempt > 2) return;
           const container = this.getThreadContainer();
           console.log("start init match info");
           if (!container) {
-            setTimeout(() => this.initMatchProfile(attribute + 1), 1e3);
+            setTimeout(() => this.initMatchProfile(attempt + 1), 1e3);
             return;
           }
           const rootCandidates = [];
@@ -235,7 +235,7 @@
           }
           if (!matchProfile) {
             console.log("failed to capture profile");
-            setTimeout(() => this.initMatchProfile(attribute + 1), 1e3);
+            setTimeout(() => this.initMatchProfile(attempt + 1), 1e3);
             return;
           }
           const rows = Array.from(matchProfile.querySelectorAll("dt"));
@@ -281,8 +281,8 @@
           console.log("matchInfo: ", this.matchInfo);
         }
         // backward compatibility
-        initMatchInfo(attribute) {
-          this.initMatchProfile(attribute);
+        initMatchInfo(attempt) {
+          this.initMatchProfile(attempt);
         }
         parseMessageItem(item) {
           const textEl = item.querySelector(this.selectors.messageText);
@@ -360,13 +360,145 @@
     }
   });
 
+  // content/profile-module/profile-thread.ts
+  var defaultSelectors2, ProfileThread;
+  var init_profile_thread = __esm({
+    "content/profile-module/profile-thread.ts"() {
+      "use strict";
+      init_message_thread();
+      defaultSelectors2 = {
+        container: "main#maincontent",
+        selfIntroduction: ".css-x9ly1l",
+        myName: 'a[href="/myprofile/nickname"] .css-1dq49vp',
+        profileInfo: ".css-8v88v5"
+      };
+      ProfileThread = class {
+        constructor(id, title, selectors = defaultSelectors2) {
+          this.id = id;
+          this.title = title;
+          this.selectors = selectors;
+          this.myProfile = null;
+          this.myName = null;
+          this.init();
+        }
+        init() {
+          this.initProfile();
+          this.initListener();
+        }
+        reset() {
+          this.myProfile = null;
+        }
+        getThreadContainer() {
+          return document.querySelector(this.selectors.container);
+        }
+        initListener() {
+        }
+        initProfile() {
+          const targetNode = this.getThreadContainer();
+          if (!targetNode) {
+            setTimeout(() => this.initProfile(), 5e3);
+            return;
+          }
+          targetNode.dataset.threadId = this.id;
+          this.initMyName(targetNode, 0);
+          this.initMyProfile(targetNode, 0);
+        }
+        initMyName(container, attempt) {
+          if (attempt > 2) {
+            return;
+          }
+          const el = container.querySelector(this.selectors.myName);
+          const name = safeText(el);
+          if (!name) {
+            console.log("failed to find myName in container");
+            setTimeout(() => this.initMyName(container, attempt + 1), 1e3);
+            return;
+          }
+          this.myName = name;
+        }
+        initMyProfile(container, attempt) {
+          if (attempt > 2) {
+            return;
+          }
+          const selfIntroductionEl = container.querySelector(this.selectors.selfIntroduction);
+          if (!selfIntroductionEl) {
+            console.log("failed to find selfIntroduction in container");
+            setTimeout(() => this.initMyProfile(container, attempt + 1), 1e3);
+            return;
+          }
+          const profileEl = container.querySelector(this.selectors.profileInfo);
+          if (!profileEl) {
+            console.log("failed to find profile in container");
+            setTimeout(() => this.initMyProfile(container, attempt + 1), 1e3);
+            return;
+          }
+          const myName = this.myName ?? safeText(container.querySelector(this.selectors.myName));
+          const age = this.normalizeAge(this.findLabeledValue(container, "\u5E74\u9F62") ?? "");
+          this.myProfile = {
+            name: myName || this.title,
+            age,
+            selfIntroduction: safeText(selfIntroductionEl) || void 0,
+            height: this.findLabeledValue(container, "\u8EAB\u9577"),
+            figure: this.findLabeledValue(container, "\u4F53\u578B"),
+            bloodType: this.findLabeledValue(container, "\u8840\u6DB2\u578B"),
+            brother: this.findLabeledValue(container, "\u5144\u5F1F\u59C9\u59B9"),
+            residence: this.findLabeledValue(container, "\u5C45\u4F4F\u5730"),
+            hometown: this.findLabeledValue(container, "\u51FA\u8EAB\u5730"),
+            jobCategory: this.findLabeledValue(container, "\u8077\u7A2E"),
+            educationalBackground: this.findLabeledValue(container, "\u5B66\u6B74"),
+            annualIncom: this.findLabeledValue(container, "\u5E74\u53CE"),
+            smoking: this.findLabeledValue(container, "\u30BF\u30D0\u30B3"),
+            schoolName: this.findLabeledValue(container, "\u5B66\u6821\u540D"),
+            jobName: this.findLabeledValue(container, "\u8077\u696D\u540D"),
+            maritalStatus: this.findLabeledValue(container, "\u7D50\u5A5A\u6B74"),
+            hasKids: this.findLabeledValue(container, "\u5B50\u4F9B\u306E\u6709\u7121"),
+            marriageIntention: this.findLabeledValue(container, "\u7D50\u5A5A\u306B\u5BFE\u3059\u308B\u610F\u601D"),
+            kidsIntention: this.findLabeledValue(container, "\u5B50\u4F9B\u304C\u6B32\u3057\u3044\u304B"),
+            houseworkAndChildcare: this.findLabeledValue(container, "\u5BB6\u4E8B\u30FB\u80B2\u5150"),
+            preferredPace: this.findLabeledValue(container, "\u51FA\u4F1A\u3046\u307E\u3067\u306E\u5E0C\u671B"),
+            costOfDate: this.findLabeledValue(container, "\u30C7\u30FC\u30C8\u8CBB\u7528"),
+            character: this.findLabeledValue(container, "\u6027\u683C\u30FB\u30BF\u30A4\u30D7"),
+            sociality: this.findLabeledValue(container, "\u793E\u4EA4\u6027"),
+            roommate: this.findLabeledValue(container, "\u540C\u5C45\u4EBA"),
+            holiday: this.findLabeledValue(container, "\u4F11\u65E5"),
+            alchole: this.findLabeledValue(container, "\u304A\u9152"),
+            hobbies: this.findLabeledValue(container, "\u597D\u304D\u306A\u3053\u3068\u30FB\u8DA3\u5473")
+          };
+          console.log("myProfile: ", this.myProfile);
+        }
+        normalizeAge(value) {
+          return value.replace(/歳$/, "").trim();
+        }
+        findLabeledValue(container, label) {
+          const keys = Array.from(container.querySelectorAll(".css-14zkggk span"));
+          for (const keyEl of keys) {
+            if (safeText(keyEl) !== label) continue;
+            const row = keyEl.closest("li") ?? keyEl.closest("fieldset") ?? keyEl.closest("div.css-1d4mlll") ?? keyEl.closest("a.css-o3ujyi");
+            if (!row) continue;
+            const candidates = Array.from(
+              row.querySelectorAll(
+                ".css-1l9toz1 .css-1czygor, .css-1l9toz1 .css-1dq49vp, .css-1l9toz1 .css-14zkggk span"
+              )
+            ).map((el) => safeText(el)).filter((v) => v.length > 0 && v !== label);
+            if (candidates.length === 0) continue;
+            return candidates[candidates.length - 1];
+          }
+          return void 0;
+        }
+      };
+    }
+  });
+
   // content/profile-module/profile-listener.ts
   var ProfileListener;
   var init_profile_listener = __esm({
     "content/profile-module/profile-listener.ts"() {
       "use strict";
+      init_profile_thread();
       ProfileListener = class {
         constructor() {
+          this.threads = /* @__PURE__ */ new Map();
+          this.activeThread = null;
           this.init();
         }
         init() {
@@ -378,7 +510,21 @@
             if (request.kind !== "PROFILE_START_OBSERVE") return;
             const url = request.url;
             const title = request.title;
-            console.log("start profile: url,", url, "title,", title);
+            if (!this.threads.has(url)) {
+              console.log("create new thread: url=", url);
+              const newThread = new ProfileThread(url, title);
+              this.threads.set(url, newThread);
+              this.activeThread?.reset();
+              this.activeThread = newThread;
+            } else {
+              const thread = this.threads.get(url);
+              console.log("use thread: url=", url);
+              if (thread) {
+                this.activeThread?.reset();
+                thread.initProfile();
+                this.activeThread = thread;
+              }
+            }
           });
         }
       };

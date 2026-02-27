@@ -1,42 +1,11 @@
+import { Profile } from "../../types";
+
 export interface ThreadMessage{
   id: string;
   time: number;
   message: string;
   isMyMessage: boolean;
 }
-
-export interface MatchInfo{
-  name: string;
-  age: string;
-  selfIntroduction?: string;
-  height?: string;
-  figure?: string;
-  bloodType?: string;
-  brother?: string;
-  residence?: string;
-  hometown?: string;
-  jobCategory?: string;
-  educationalBackground?: string; //最終学歴
-  annualIncom?: string;
-  smoking?: string;
-  schoolName?: string;
-  jobName?: string;
-  maritalStatus?: string; //結婚歴
-  hasKids?: string; //子供の有無
-  marriageIntention?: string; //結婚の意思
-  kidsIntention?: string; //子供が欲しいか
-  houseworkAndChildcare?: string; //家事・育児
-  preferredPace?: string; //合うまでの希望
-  costOfDate?: string; //デート費用
-  character?: string; //性格
-  sociality?: string; //社交性
-  roommate?: string; //同居人
-  holiday?: string; //休日
-  alchole?: string; //お酒
-  hobbies?: string; //趣味
-}
-
-
 
 export interface ThreadSelectors{
   container:string;
@@ -66,7 +35,7 @@ export const defaultSelectors: ThreadSelectors = {
   mineClass: "css-1y1ka7w",
 }
 
-function safeText(el: Element | null):string{
+export function safeText(el: Element | null):string{
   return (el?.textContent ?? "").trim();
 }
 
@@ -196,7 +165,7 @@ export class MessageThread{
   private observer: MutationObserver | null=null;
   private threadItems: ThreadMessage[]=[];
   private seenIds=new Set<string>();
-  private matchInfo: MatchInfo | null=null;
+  private matchInfo: Profile | null=null;
   private matchName: string | null=null;
 
   constructor(
@@ -268,7 +237,7 @@ export class MessageThread{
     console.log("threadItems: ",this.threadItems);
   }
   
-  private initMatchName(container: HTMLElement,attribute: number){
+  private initMatchName(container: HTMLElement,attempt: number){
     const selector = this.selectors.matchName.startsWith(".")
       || this.selectors.matchName.startsWith("#")
       || this.selectors.matchName.includes("[")
@@ -279,8 +248,8 @@ export class MessageThread{
     const item=container.querySelector(selector) ?? document.querySelector(selector);
     const name=safeText(item);
     if(!name){
-      console.log("failed to find name, attribute=",attribute);
-      setTimeout(()=>this.initMatchName(container,attribute+1),1000);
+      console.log("failed to find name, attempt=",attempt);
+      setTimeout(()=>this.initMatchName(container,attempt+1),1000);
       return;
     }
 
@@ -288,12 +257,12 @@ export class MessageThread{
     console.log("matchName: ", this.matchName);
   }
 
-  initMatchProfile(attribute:number){
-    if(attribute>2)return;
+  initMatchProfile(attempt:number){
+    if(attempt>2)return;
     const container=this.getThreadContainer();
     console.log("start init match info");
     if(!container){
-      setTimeout(()=>this.initMatchProfile(attribute+1),1000);
+      setTimeout(()=>this.initMatchProfile(attempt+1),1000);
       return;
     }
 
@@ -329,7 +298,7 @@ export class MessageThread{
     // DOMが反映されていない場合はもう一度
     if(!matchProfile) {
       console.log("failed to capture profile");
-      setTimeout(()=>this.initMatchProfile(attribute+1),1000);
+      setTimeout(()=>this.initMatchProfile(attempt+1),1000);
       return;
     }
 
@@ -378,8 +347,8 @@ export class MessageThread{
   }
 
   // backward compatibility
-  initMatchInfo(attribute:number){
-    this.initMatchProfile(attribute);
+  initMatchInfo(attempt:number){
+    this.initMatchProfile(attempt);
   }
 
   private parseMessageItem(item: Element):ThreadMessage | null{

@@ -46,7 +46,7 @@ export class GenericListener{
         command=COMMANDS.PARTNER_OPEN;
       }else if(url.includes("pairs.lv/message/detail")){
         command=COMMANDS.MESSAGE_OPEN;
-      }else if(url.includes("pairs.lv/other")){
+      }else if(url.includes("pairs.lv/myprofile")){
         command=COMMANDS.PROFILE_OPEN;
       }
 
