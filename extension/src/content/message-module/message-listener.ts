@@ -22,6 +22,7 @@ export class MessageListener{
 
       if((request as any).kind==="MESSAGE_OPEN_PROFILE"){
         this.activeThread?.initMatchProfile(0);
+        this.activeThread?.initProfilePane();
         return;
       }
       if(
@@ -34,9 +35,10 @@ export class MessageListener{
 
       if(!this.threads.has(url)){
         console.log("create new thread: url=",url);
-        const newThread=new MessageThread(url,title);
-        this.threads.set(url,newThread);
         this.activeThread?.reset();
+        const newThread=new MessageThread(url,title);
+        newThread.initMessagePane();
+        this.threads.set(url,newThread);
         this.activeThread=newThread;
       }else{
         const thread=this.threads.get(url);
@@ -44,6 +46,7 @@ export class MessageListener{
         if(thread){
           this.activeThread?.reset();
           thread.initPageObserver();
+          thread.initMessagePane();
           this.activeThread=thread;
         }
       }

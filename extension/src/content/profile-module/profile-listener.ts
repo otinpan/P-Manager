@@ -13,15 +13,20 @@ export class ProfileListener{
   listen(){
     chrome.runtime.onMessage.addListener((request,sender,sendResponse)=>{
       if(!request||typeof request !=="object")return;
-      if((request as any).kind!=="PROFILE_START_OBSERVE")return;
+      if((request as any).kind!=="PROFILE_START_OBSERVE"){
+        this.activeThread?.reset();
+        this.activeThread=null;
+        return;
+      }
       const url=request.url;
       const title=request.title;
       
       if(!this.threads.has(url)){
         console.log("create new thread: url=",url);
-        const newThread=new ProfileThread(url,title);
-        this.threads.set(url,newThread);
         this.activeThread?.reset();
+        const newThread=new ProfileThread(url,title);
+        newThread.initProfilePane();
+        this.threads.set(url,newThread);
         this.activeThread=newThread;
       }else{
         const thread=this.threads.get(url);
@@ -29,6 +34,7 @@ export class ProfileListener{
         if(thread){
           this.activeThread?.reset();
           thread.initProfile();
+          thread.initProfilePane();
           this.activeThread=thread;
         }
       }

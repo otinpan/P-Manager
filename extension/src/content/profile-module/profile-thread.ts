@@ -1,5 +1,7 @@
 import {Profile} from "../../types"
 import {safeText} from "../message-module/message-thread"
+import { ensureExtensionPanel, removeExtensionPanel } from "../shared/extension-panel-view";
+import { buildSendButtonCss, buildSendButtonHtml } from "../shared/send-button-view";
 export interface ThreadSelectors{
   container: string;
   selfIntroduction: string;
@@ -17,6 +19,13 @@ export const defaultSelectors: ThreadSelectors={
 export class ProfileThread{
   private myProfile: Profile | null=null;
   private myName: string | null=null;
+  private isProfilePaneVisible = false;
+  private sendButton: HTMLButtonElement | null = null;
+  private readonly sendProfileButtonId = "p-manager-profile-send-button";
+  private readonly sendProfileButtonStyleId = "p-manager-profile-send-style";
+  private readonly profilePanelId = "p-manager-profile-panel";
+  private readonly profilePanelStyleId = "p-manager-profile-panel-style";
+  private readonly profilePanelWidthStorageKey = "p-manager-profile-panel-width";
 
   constructor(
     readonly id:string,
@@ -33,6 +42,7 @@ export class ProfileThread{
 
   reset(){
     this.myProfile=null;
+    this.destroyProfilePane();
   }
 
   private getThreadContainer(){
@@ -40,6 +50,80 @@ export class ProfileThread{
   }
   private initListener(){
 
+  }
+
+  initMessagePane(){
+    // 互換用: 既存呼び出しが残っていても profile pane を表示する
+    this.initProfilePane();
+  }
+
+  initProfilePane(){
+    this.ensureProfilePaneStyle();
+    this.isProfilePaneVisible = true;
+
+    const panelBody = ensureExtensionPanel({
+      sidebarId: this.profilePanelId,
+      styleId: this.profilePanelStyleId,
+      title: "P-Manager Profile",
+      storageKey: this.profilePanelWidthStorageKey,
+      defaultWidth: 320,
+      minWidth: 260,
+      maxWidth: 700,
+    });
+
+    const profileText =
+      this.myProfile == null
+        ? "profileInfo: null"
+        : JSON.stringify(this.myProfile,null,2);
+    panelBody.innerHTML = `<div>Profile Page</div><pre></pre>${buildSendButtonHtml(this.sendProfileButtonId)}`;
+    const pre = panelBody.querySelector("pre");
+    if(pre) pre.textContent = profileText;
+    const button = panelBody.querySelector(`#${this.sendProfileButtonId}`) as HTMLButtonElement | null;
+    if(!button) return;
+    button.addEventListener("click",()=>this.onSendButtonClick());
+
+    this.sendButton = button;
+  }
+
+  private ensureProfilePaneStyle(){
+    if(document.getElementById(this.sendProfileButtonStyleId)) return;
+
+    const style = document.createElement("style");
+    style.id = this.sendProfileButtonStyleId;
+    style.textContent = `
+      #${this.profilePanelId} pre {
+        margin: 0;
+        padding: 10px;
+        border: 1px solid #cbd5e1;
+        border-radius: 8px;
+        background: #ffffff;
+        color: #0f172a;
+        font-size: 12px;
+        line-height: 1.4;
+        white-space: pre-wrap;
+        overflow-wrap: anywhere;
+      }
+      ${buildSendButtonCss(this.sendProfileButtonId,"#0ea5e9","#0284c7")}
+    `;
+
+    document.head.appendChild(style);
+  }
+
+  private destroyProfilePane(){
+    this.sendButton?.remove();
+    this.sendButton = null;
+    this.isProfilePaneVisible = false;
+    removeExtensionPanel(this.profilePanelId);
+  }
+
+  private onSendButtonClick(){
+    chrome.runtime.sendMessage({
+      kind: "PROFILE_SEND_BUTTON_CLICKED",
+      url: this.id,
+      title: this.title,
+    }).catch(()=>{
+
+    });
   }
 
   initProfile(){
@@ -124,6 +208,9 @@ export class ProfileThread{
     };
 
     console.log("myProfile: ",this.myProfile);
+    if(this.isProfilePaneVisible){
+      this.initProfilePane();
+    }
     
   }
 

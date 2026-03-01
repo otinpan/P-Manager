@@ -117,12 +117,24 @@ var init_message_handler = __esm({
     MessageHandler = class extends Handler {
       constructor() {
         super(PAGE_ID_MESSAGE);
+        this.mCommand = null;
+        this.initSendButtonListener();
+      }
+      initSendButtonListener() {
+        chrome.runtime.onMessage.addListener((request) => {
+          if (!request || typeof request !== "object") return;
+          if (request.kind !== "MESSAGE_SEND_BUTTON_CLICKED") return;
+          this.onSendButtonClicked(request);
+        });
+      }
+      onSendButtonClicked(_request) {
       }
       onGenericEvent(ev) {
         if ((ev.command === "messageOpen" /* MESSAGE_OPEN */ || ev.command === "partnerOpen" /* PARTNER_OPEN */) && ev.url) {
           console.log(ev.command === "partnerOpen" /* PARTNER_OPEN */ ? "partner page" : "message page");
           if (!ev.url) return;
           this.setEnabled(true);
+          this.mCommand = ev.command;
           const kind = ev.command === "messageOpen" /* MESSAGE_OPEN */ ? "MESSAGE_START_OBSERVE" : "MESSAGE_OPEN_PROFILE";
           chrome.tabs.sendMessage(ev.tabId, {
             kind,
@@ -154,6 +166,16 @@ var init_profile_handler = __esm({
     ProfileHandler = class extends Handler {
       constructor() {
         super(PAGE_ID_PROFILE);
+        this.initSendButtonListener();
+      }
+      initSendButtonListener() {
+        chrome.runtime.onMessage.addListener((request) => {
+          if (!request || typeof request !== "object") return;
+          if (request.kind !== "PROFILE_SEND_BUTTON_CLICKED") return;
+          this.onSendButtonClicked(request);
+        });
+      }
+      onSendButtonClicked(_request) {
       }
       onGenericEvent(ev) {
         if (ev.command === "profileOpen" /* PROFILE_OPEN */ && ev.url) {

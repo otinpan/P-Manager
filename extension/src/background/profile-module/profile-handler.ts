@@ -10,6 +10,19 @@ import { Handler } from "../handler";
 export class ProfileHandler extends Handler{
   constructor(){
     super(PAGE_ID_PROFILE);
+    this.initSendButtonListener();
+  }
+
+  private initSendButtonListener(){
+    chrome.runtime.onMessage.addListener((request)=>{
+      if(!request||typeof request!=="object") return;
+      if((request as any).kind!=="PROFILE_SEND_BUTTON_CLICKED") return;
+      this.onSendButtonClicked(request);
+    });
+  }
+
+  private onSendButtonClicked(_request: unknown){
+    // TODO: 送るボタンクリック時のイベント処理をここに実装
   }
 
   public onGenericEvent(ev: GenericEvent){

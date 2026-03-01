@@ -1,4 +1,6 @@
 import { Profile } from "../../types";
+import { ensureExtensionPanel, removeExtensionPanel } from "../shared/extension-panel-view";
+import { buildSendButtonCss, buildSendButtonHtml } from "../shared/send-button-view";
 
 export interface ThreadMessage{
   id: string;
@@ -167,6 +169,13 @@ export class MessageThread{
   private seenIds=new Set<string>();
   private matchInfo: Profile | null=null;
   private matchName: string | null=null;
+  private activePane: "message" | "profile" | null = null;
+  private sendButton: HTMLButtonElement | null = null;
+  private readonly sendMessageButtonId = "p-manager-message-send-button";
+  private readonly sendMessageButtonStyleId = "p-manager-message-send-style";
+  private readonly messagePanelId = "p-manager-message-panel";
+  private readonly messagePanelStyleId = "p-manager-message-panel-style";
+  private readonly messagePanelWidthStorageKey = "p-manager-message-panel-width";
 
   constructor(
     readonly id:string, 
@@ -222,6 +231,104 @@ export class MessageThread{
     this.destroyPageObserver();
     this.destroyThreadItems();
     this.matchInfo=null;
+    this.destroyPane();
+  }
+
+  initMessagePane(){
+    this.ensurePaneStyle();
+    this.activePane = "message";
+
+    const panelBody = ensureExtensionPanel({
+      sidebarId: this.messagePanelId,
+      styleId: this.messagePanelStyleId,
+      title: "P-Manager Message",
+      storageKey: this.messagePanelWidthStorageKey,
+      defaultWidth: 320,
+      minWidth: 260,
+      maxWidth: 700,
+    });
+
+    const content =
+      this.threadItems.length === 0
+        ? "threadItems: []"
+        : JSON.stringify(this.threadItems,null,2);
+    panelBody.innerHTML = `<div>Message Page</div><pre></pre>${buildSendButtonHtml(this.sendMessageButtonId)}`;
+    const pre = panelBody.querySelector("pre");
+    if(pre) pre.textContent = content;
+    const button = panelBody.querySelector(`#${this.sendMessageButtonId}`) as HTMLButtonElement | null;
+    if(!button) return;
+    button.addEventListener("click",()=>this.onSendButtonClick());
+
+    this.sendButton = button;
+  }
+
+  initProfilePane(){
+    this.ensurePaneStyle();
+    this.activePane = "profile";
+
+    const panelBody = ensureExtensionPanel({
+      sidebarId: this.messagePanelId,
+      styleId: this.messagePanelStyleId,
+      title: "P-Manager Message",
+      storageKey: this.messagePanelWidthStorageKey,
+      defaultWidth: 320,
+      minWidth: 260,
+      maxWidth: 700,
+    });
+
+    const content =
+      this.matchInfo == null
+        ? "matchInfo: null"
+        : JSON.stringify(this.matchInfo,null,2);
+    panelBody.innerHTML = `<div>Profile Page</div><pre></pre>${buildSendButtonHtml(this.sendMessageButtonId)}`;
+    const pre = panelBody.querySelector("pre");
+    if(pre) pre.textContent = content;
+    const button = panelBody.querySelector(`#${this.sendMessageButtonId}`) as HTMLButtonElement | null;
+    if(!button) return;
+    button.addEventListener("click",()=>this.onSendButtonClick());
+
+    this.sendButton = button;
+  }
+
+  private ensurePaneStyle(){
+    if(document.getElementById(this.sendMessageButtonStyleId)) return;
+
+    const style = document.createElement("style");
+    style.id = this.sendMessageButtonStyleId;
+    style.textContent = `
+      #${this.messagePanelId} pre {
+        margin: 0;
+        padding: 10px;
+        border: 1px solid #cbd5e1;
+        border-radius: 8px;
+        background: #ffffff;
+        color: #0f172a;
+        font-size: 12px;
+        line-height: 1.4;
+        white-space: pre-wrap;
+        overflow-wrap: anywhere;
+      }
+      ${buildSendButtonCss(this.sendMessageButtonId,"#0d9488","#0f766e")}
+    `;
+
+    document.head.appendChild(style);
+  }
+
+  private destroyPane(){
+    this.sendButton?.remove();
+    this.sendButton = null;
+    this.activePane = null;
+    removeExtensionPanel(this.messagePanelId);
+  }
+
+  private onSendButtonClick(){
+    chrome.runtime.sendMessage({
+      kind: "MESSAGE_SEND_BUTTON_CLICKED",
+      url: this.id,
+      title: this.title,
+    }).catch(()=>{
+
+    });
   }
 
   private initThreadItems(container: HTMLElement){
@@ -344,6 +451,9 @@ export class MessageThread{
       costOfDate: kv["デート費用"],
     };
     console.log("matchInfo: ",this.matchInfo);
+    if(this.activePane==="profile"){
+      this.initProfilePane();
+    }
   }
 
   // backward compatibility
@@ -397,6 +507,9 @@ export class MessageThread{
       }
     }
     console.log("threadItems: ",this.threadItems);
+    if(this.activePane==="message"){
+      this.initMessagePane();
+    }
   }
 
 

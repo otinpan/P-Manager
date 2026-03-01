@@ -8,8 +8,22 @@ import{
 import { Handler } from "../handler";
 
 export class MessageHandler extends Handler{
+  private mCommand:COMMANDS | null=null;
   constructor(){
     super(PAGE_ID_MESSAGE);
+    this.initSendButtonListener();
+  }
+
+  private initSendButtonListener(){
+    chrome.runtime.onMessage.addListener((request)=>{
+      if(!request||typeof request!=="object") return;
+      if((request as any).kind!=="MESSAGE_SEND_BUTTON_CLICKED") return;
+      this.onSendButtonClicked(request);
+    });
+  }
+
+  private onSendButtonClicked(_request: unknown){
+    // TODO: 送るボタンクリック時のイベント処理をここに実装
   }
 
   public onGenericEvent(ev: GenericEvent){
@@ -18,6 +32,8 @@ export class MessageHandler extends Handler{
       if(!ev.url)return;
 
       this.setEnabled(true);
+
+      this.mCommand=ev.command;
 
       const kind =
         ev.command === COMMANDS.MESSAGE_OPEN
@@ -41,4 +57,8 @@ export class MessageHandler extends Handler{
       this.setEnabled(false);
     }
   }
+
+  
+
+  
 }

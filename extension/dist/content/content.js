@@ -8,6 +8,193 @@
     return mod || (0, cb[__getOwnPropNames(cb)[0]])((mod = { exports: {} }).exports, mod), mod.exports;
   };
 
+  // content/shared/extension-panel-view.ts
+  function ensureExtensionPanel(options) {
+    ensureExtensionPanelStyle(options);
+    let sidebar = document.getElementById(options.sidebarId);
+    if (!sidebar) {
+      sidebar = document.createElement("aside");
+      sidebar.id = options.sidebarId;
+      sidebar.innerHTML = `
+      <div class="${RESIZE_HANDLE_CLASS}" aria-hidden="true"></div>
+      <header>
+        <h2>${options.title}</h2>
+      </header>
+      <section class="${PANEL_BODY_CLASS}"></section>
+    `;
+      document.body.appendChild(sidebar);
+    }
+    const width = getSavedWidth(options.storageKey, options.defaultWidth ?? 320);
+    const minWidth = options.minWidth ?? 260;
+    const maxWidth = options.maxWidth ?? 700;
+    sidebar.style.width = `${clamp(width, minWidth, maxWidth)}px`;
+    initResizeBehavior(sidebar, options);
+    const body = sidebar.querySelector(`.${PANEL_BODY_CLASS}`);
+    if (!body) {
+      throw new Error("failed to initialize extension panel body");
+    }
+    return body;
+  }
+  function removeExtensionPanel(sidebarId) {
+    const sidebar = document.getElementById(sidebarId);
+    sidebar?.remove();
+  }
+  function ensureExtensionPanelStyle(options) {
+    if (document.getElementById(options.styleId)) return;
+    const style = document.createElement("style");
+    style.id = options.styleId;
+    style.textContent = `
+    #${options.sidebarId} {
+      position: fixed;
+      top: 0;
+      right: 0;
+      bottom: 0;
+      z-index: 999998;
+      display: flex;
+      flex-direction: column;
+      background: #f8fafc;
+      border-left: 1px solid #cbd5e1;
+      box-shadow: -8px 0 20px rgba(15, 23, 42, 0.18);
+      font-family: "Segoe UI", "Hiragino Kaku Gothic ProN", "Noto Sans JP", sans-serif;
+    }
+
+    #${options.sidebarId} > header {
+      border-bottom: 1px solid #e2e8f0;
+      background: #f1f5f9;
+      padding: 12px 14px;
+    }
+
+    #${options.sidebarId} > header > h2 {
+      margin: 0;
+      font-size: 13px;
+      font-weight: 700;
+      color: #0f172a;
+    }
+
+    #${options.sidebarId} .${PANEL_BODY_CLASS} {
+      flex: 1;
+      overflow: auto;
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    #${options.sidebarId} .${RESIZE_HANDLE_CLASS} {
+      position: absolute;
+      top: 0;
+      left: -5px;
+      width: 10px;
+      height: 100%;
+      cursor: ew-resize;
+      user-select: none;
+      touch-action: none;
+    }
+
+    #${options.sidebarId} .${RESIZE_HANDLE_CLASS}:hover::after {
+      content: "";
+      position: absolute;
+      top: 0;
+      left: 4px;
+      width: 2px;
+      height: 100%;
+      background: #0ea5e9;
+      opacity: 0.6;
+    }
+  `;
+    document.head.appendChild(style);
+  }
+  function initResizeBehavior(sidebar, options) {
+    if (sidebar.dataset.resizeReady === "1") return;
+    const handle = sidebar.querySelector(`.${RESIZE_HANDLE_CLASS}`);
+    if (!handle) return;
+    const minWidth = options.minWidth ?? 260;
+    const maxWidth = options.maxWidth ?? 700;
+    let dragging = false;
+    const onMouseMove = (event) => {
+      if (!dragging) return;
+      const width = clamp(window.innerWidth - event.clientX, minWidth, maxWidth);
+      sidebar.style.width = `${width}px`;
+    };
+    const onMouseUp = () => {
+      if (!dragging) return;
+      dragging = false;
+      document.body.style.cursor = "";
+      document.body.style.userSelect = "";
+      const currentWidth = Math.round(sidebar.getBoundingClientRect().width);
+      saveWidth(options.storageKey, currentWidth);
+      document.removeEventListener("mousemove", onMouseMove);
+      document.removeEventListener("mouseup", onMouseUp);
+    };
+    handle.addEventListener("mousedown", (event) => {
+      event.preventDefault();
+      dragging = true;
+      document.body.style.cursor = "ew-resize";
+      document.body.style.userSelect = "none";
+      document.addEventListener("mousemove", onMouseMove);
+      document.addEventListener("mouseup", onMouseUp);
+    });
+    sidebar.dataset.resizeReady = "1";
+  }
+  function clamp(value, min, max) {
+    return Math.min(max, Math.max(min, value));
+  }
+  function getSavedWidth(storageKey, fallback) {
+    try {
+      const raw = window.localStorage.getItem(storageKey);
+      if (!raw) return fallback;
+      const width = Number(raw);
+      if (!Number.isFinite(width)) return fallback;
+      return width;
+    } catch {
+      return fallback;
+    }
+  }
+  function saveWidth(storageKey, width) {
+    try {
+      window.localStorage.setItem(storageKey, String(width));
+    } catch {
+    }
+  }
+  var PANEL_BODY_CLASS, RESIZE_HANDLE_CLASS;
+  var init_extension_panel_view = __esm({
+    "content/shared/extension-panel-view.ts"() {
+      "use strict";
+      PANEL_BODY_CLASS = "p-manager-extension-panel-body";
+      RESIZE_HANDLE_CLASS = "p-manager-extension-panel-resize";
+    }
+  });
+
+  // content/shared/send-button-view.ts
+  function buildSendButtonHtml(buttonId) {
+    return `<button id="${buttonId}" type="button">\u9001\u308B</button>`;
+  }
+  function buildSendButtonCss(buttonId, baseColor, hoverColor) {
+    return `
+    #${buttonId} {
+      border: none;
+      border-radius: 10px;
+      padding: 10px 18px;
+      font-size: 14px;
+      font-weight: 700;
+      color: #ffffff;
+      background: ${baseColor};
+      cursor: pointer;
+      width: 100%;
+      box-shadow: 0 8px 20px rgba(0, 0, 0, 0.2);
+    }
+
+    #${buttonId}:hover {
+      background: ${hoverColor};
+    }
+  `;
+  }
+  var init_send_button_view = __esm({
+    "content/shared/send-button-view.ts"() {
+      "use strict";
+    }
+  });
+
   // content/message-module/message-thread.ts
   function safeText(el) {
     return (el?.textContent ?? "").trim();
@@ -102,6 +289,8 @@
   var init_message_thread = __esm({
     "content/message-module/message-thread.ts"() {
       "use strict";
+      init_extension_panel_view();
+      init_send_button_view();
       defaultSelectors = {
         container: "main#maincontent",
         messageItem: 'li[data-test^="message-sent-time-"]',
@@ -123,6 +312,13 @@
           this.seenIds = /* @__PURE__ */ new Set();
           this.matchInfo = null;
           this.matchName = null;
+          this.activePane = null;
+          this.sendButton = null;
+          this.sendMessageButtonId = "p-manager-message-send-button";
+          this.sendMessageButtonStyleId = "p-manager-message-send-style";
+          this.messagePanelId = "p-manager-message-panel";
+          this.messagePanelStyleId = "p-manager-message-panel-style";
+          this.messagePanelWidthStorageKey = "p-manager-message-panel-width";
           this.handleMutations = (mutations) => {
             for (const m of mutations) {
               for (const node of Array.from(m.addedNodes)) {
@@ -140,6 +336,9 @@
               }
             }
             console.log("threadItems: ", this.threadItems);
+            if (this.activePane === "message") {
+              this.initMessagePane();
+            }
           };
           this.init();
         }
@@ -178,6 +377,84 @@
           this.destroyPageObserver();
           this.destroyThreadItems();
           this.matchInfo = null;
+          this.destroyPane();
+        }
+        initMessagePane() {
+          this.ensurePaneStyle();
+          this.activePane = "message";
+          const panelBody = ensureExtensionPanel({
+            sidebarId: this.messagePanelId,
+            styleId: this.messagePanelStyleId,
+            title: "P-Manager Message",
+            storageKey: this.messagePanelWidthStorageKey,
+            defaultWidth: 320,
+            minWidth: 260,
+            maxWidth: 700
+          });
+          const content = this.threadItems.length === 0 ? "threadItems: []" : JSON.stringify(this.threadItems, null, 2);
+          panelBody.innerHTML = `<div>Message Page</div><pre></pre>${buildSendButtonHtml(this.sendMessageButtonId)}`;
+          const pre = panelBody.querySelector("pre");
+          if (pre) pre.textContent = content;
+          const button = panelBody.querySelector(`#${this.sendMessageButtonId}`);
+          if (!button) return;
+          button.addEventListener("click", () => this.onSendButtonClick());
+          this.sendButton = button;
+        }
+        initProfilePane() {
+          this.ensurePaneStyle();
+          this.activePane = "profile";
+          const panelBody = ensureExtensionPanel({
+            sidebarId: this.messagePanelId,
+            styleId: this.messagePanelStyleId,
+            title: "P-Manager Message",
+            storageKey: this.messagePanelWidthStorageKey,
+            defaultWidth: 320,
+            minWidth: 260,
+            maxWidth: 700
+          });
+          const content = this.matchInfo == null ? "matchInfo: null" : JSON.stringify(this.matchInfo, null, 2);
+          panelBody.innerHTML = `<div>Profile Page</div><pre></pre>${buildSendButtonHtml(this.sendMessageButtonId)}`;
+          const pre = panelBody.querySelector("pre");
+          if (pre) pre.textContent = content;
+          const button = panelBody.querySelector(`#${this.sendMessageButtonId}`);
+          if (!button) return;
+          button.addEventListener("click", () => this.onSendButtonClick());
+          this.sendButton = button;
+        }
+        ensurePaneStyle() {
+          if (document.getElementById(this.sendMessageButtonStyleId)) return;
+          const style = document.createElement("style");
+          style.id = this.sendMessageButtonStyleId;
+          style.textContent = `
+      #${this.messagePanelId} pre {
+        margin: 0;
+        padding: 10px;
+        border: 1px solid #cbd5e1;
+        border-radius: 8px;
+        background: #ffffff;
+        color: #0f172a;
+        font-size: 12px;
+        line-height: 1.4;
+        white-space: pre-wrap;
+        overflow-wrap: anywhere;
+      }
+      ${buildSendButtonCss(this.sendMessageButtonId, "#0d9488", "#0f766e")}
+    `;
+          document.head.appendChild(style);
+        }
+        destroyPane() {
+          this.sendButton?.remove();
+          this.sendButton = null;
+          this.activePane = null;
+          removeExtensionPanel(this.messagePanelId);
+        }
+        onSendButtonClick() {
+          chrome.runtime.sendMessage({
+            kind: "MESSAGE_SEND_BUTTON_CLICKED",
+            url: this.id,
+            title: this.title
+          }).catch(() => {
+          });
         }
         initThreadItems(container) {
           const items = Array.from(container.querySelectorAll(this.selectors.messageItem));
@@ -279,6 +556,9 @@
             costOfDate: kv["\u30C7\u30FC\u30C8\u8CBB\u7528"]
           };
           console.log("matchInfo: ", this.matchInfo);
+          if (this.activePane === "profile") {
+            this.initProfilePane();
+          }
         }
         // backward compatibility
         initMatchInfo(attempt) {
@@ -333,6 +613,7 @@
             }
             if (request.kind === "MESSAGE_OPEN_PROFILE") {
               this.activeThread?.initMatchProfile(0);
+              this.activeThread?.initProfilePane();
               return;
             }
             if (request.kind !== "MESSAGE_START_OBSERVE" && request.kind !== "MESSAGE_OPEN_PROFILE") return;
@@ -341,9 +622,10 @@
             const title = request.title;
             if (!this.threads.has(url)) {
               console.log("create new thread: url=", url);
-              const newThread = new MessageThread(url, title);
-              this.threads.set(url, newThread);
               this.activeThread?.reset();
+              const newThread = new MessageThread(url, title);
+              newThread.initMessagePane();
+              this.threads.set(url, newThread);
               this.activeThread = newThread;
             } else {
               const thread = this.threads.get(url);
@@ -351,6 +633,7 @@
               if (thread) {
                 this.activeThread?.reset();
                 thread.initPageObserver();
+                thread.initMessagePane();
                 this.activeThread = thread;
               }
             }
@@ -366,6 +649,8 @@
     "content/profile-module/profile-thread.ts"() {
       "use strict";
       init_message_thread();
+      init_extension_panel_view();
+      init_send_button_view();
       defaultSelectors2 = {
         container: "main#maincontent",
         selfIntroduction: ".css-x9ly1l",
@@ -379,6 +664,13 @@
           this.selectors = selectors;
           this.myProfile = null;
           this.myName = null;
+          this.isProfilePaneVisible = false;
+          this.sendButton = null;
+          this.sendProfileButtonId = "p-manager-profile-send-button";
+          this.sendProfileButtonStyleId = "p-manager-profile-send-style";
+          this.profilePanelId = "p-manager-profile-panel";
+          this.profilePanelStyleId = "p-manager-profile-panel-style";
+          this.profilePanelWidthStorageKey = "p-manager-profile-panel-width";
           this.init();
         }
         init() {
@@ -387,11 +679,71 @@
         }
         reset() {
           this.myProfile = null;
+          this.destroyProfilePane();
         }
         getThreadContainer() {
           return document.querySelector(this.selectors.container);
         }
         initListener() {
+        }
+        initMessagePane() {
+          this.initProfilePane();
+        }
+        initProfilePane() {
+          this.ensureProfilePaneStyle();
+          this.isProfilePaneVisible = true;
+          const panelBody = ensureExtensionPanel({
+            sidebarId: this.profilePanelId,
+            styleId: this.profilePanelStyleId,
+            title: "P-Manager Profile",
+            storageKey: this.profilePanelWidthStorageKey,
+            defaultWidth: 320,
+            minWidth: 260,
+            maxWidth: 700
+          });
+          const profileText = this.myProfile == null ? "profileInfo: null" : JSON.stringify(this.myProfile, null, 2);
+          panelBody.innerHTML = `<div>Profile Page</div><pre></pre>${buildSendButtonHtml(this.sendProfileButtonId)}`;
+          const pre = panelBody.querySelector("pre");
+          if (pre) pre.textContent = profileText;
+          const button = panelBody.querySelector(`#${this.sendProfileButtonId}`);
+          if (!button) return;
+          button.addEventListener("click", () => this.onSendButtonClick());
+          this.sendButton = button;
+        }
+        ensureProfilePaneStyle() {
+          if (document.getElementById(this.sendProfileButtonStyleId)) return;
+          const style = document.createElement("style");
+          style.id = this.sendProfileButtonStyleId;
+          style.textContent = `
+      #${this.profilePanelId} pre {
+        margin: 0;
+        padding: 10px;
+        border: 1px solid #cbd5e1;
+        border-radius: 8px;
+        background: #ffffff;
+        color: #0f172a;
+        font-size: 12px;
+        line-height: 1.4;
+        white-space: pre-wrap;
+        overflow-wrap: anywhere;
+      }
+      ${buildSendButtonCss(this.sendProfileButtonId, "#0ea5e9", "#0284c7")}
+    `;
+          document.head.appendChild(style);
+        }
+        destroyProfilePane() {
+          this.sendButton?.remove();
+          this.sendButton = null;
+          this.isProfilePaneVisible = false;
+          removeExtensionPanel(this.profilePanelId);
+        }
+        onSendButtonClick() {
+          chrome.runtime.sendMessage({
+            kind: "PROFILE_SEND_BUTTON_CLICKED",
+            url: this.id,
+            title: this.title
+          }).catch(() => {
+          });
         }
         initProfile() {
           const targetNode = this.getThreadContainer();
@@ -465,6 +817,9 @@
             hobbies: this.findLabeledValue(container, "\u597D\u304D\u306A\u3053\u3068\u30FB\u8DA3\u5473")
           };
           console.log("myProfile: ", this.myProfile);
+          if (this.isProfilePaneVisible) {
+            this.initProfilePane();
+          }
         }
         normalizeAge(value) {
           return value.replace(/歳$/, "").trim();
@@ -507,14 +862,19 @@
         listen() {
           chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
             if (!request || typeof request !== "object") return;
-            if (request.kind !== "PROFILE_START_OBSERVE") return;
+            if (request.kind !== "PROFILE_START_OBSERVE") {
+              this.activeThread?.reset();
+              this.activeThread = null;
+              return;
+            }
             const url = request.url;
             const title = request.title;
             if (!this.threads.has(url)) {
               console.log("create new thread: url=", url);
-              const newThread = new ProfileThread(url, title);
-              this.threads.set(url, newThread);
               this.activeThread?.reset();
+              const newThread = new ProfileThread(url, title);
+              newThread.initProfilePane();
+              this.threads.set(url, newThread);
               this.activeThread = newThread;
             } else {
               const thread = this.threads.get(url);
@@ -522,6 +882,7 @@
               if (thread) {
                 this.activeThread?.reset();
                 thread.initProfile();
+                thread.initProfilePane();
                 this.activeThread = thread;
               }
             }
