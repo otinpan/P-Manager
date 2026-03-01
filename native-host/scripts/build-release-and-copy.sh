@@ -5,23 +5,32 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 MANIFEST_PATH="${REPO_ROOT}/native-host/Cargo.toml"
 TEMP_MANIFEST_PATH="${REPO_ROOT}/native-host/Cargo.build.tmp.toml"
-HOST_MANIFEST_JSON="${REPO_ROOT}/p_manager_host_chrome.json"
 TARGET="x86_64-pc-windows-gnu"
 SRC_EXE="${REPO_ROOT}/native-host/target/${TARGET}/release/native-host.exe"
 
-if [[ ! -f "${HOST_MANIFEST_JSON}" ]]; then
-  echo "Host manifest not found: ${HOST_MANIFEST_JSON}" >&2
-  exit 1
-fi
-
-win_path_raw="$(sed -n 's/.*"path"[[:space:]]*:[[:space:]]*"\(.*\)".*/\1/p' "${HOST_MANIFEST_JSON}" | head -n 1)"
-if [[ -z "${win_path_raw}" ]]; then
-  echo "Failed to read \"path\" from ${HOST_MANIFEST_JSON}" >&2
-  exit 1
-fi
-
-# JSON escaped backslashes (\\) -> Windows path backslashes (\)
-win_path="${win_path_raw//\\\\/\\}"
+get_windows_local_app_data() {
+  local value=""
+  if [[ -n "${WIN_LOCALAPPDATA:-}" ]]; then
+    echo "${WIN_LOCALAPPDATA}"
+    return
+  fi
+  if command -v cmd.exe >/dev/null 2>&1; then
+    value="$(cmd.exe /C "echo %LOCALAPPDATA%" 2>/dev/null | tr -d '\r' | tail -n 1)"
+    if [[ -n "${value}" && "${value}" != "%LOCALAPPDATA%" ]]; then
+      echo "${value}"
+      return
+    fi
+  fi
+  if command -v powershell.exe >/dev/null 2>&1; then
+    value="$(powershell.exe -NoProfile -Command "[Environment]::GetFolderPath('LocalApplicationData')" 2>/dev/null | tr -d '\r' | tail -n 1)"
+    if [[ -n "${value}" ]]; then
+      echo "${value}"
+      return
+    fi
+  fi
+  echo "could not resolve Windows LOCALAPPDATA from WSL. Set WIN_LOCALAPPDATA, e.g. C:\\Users\\<User>\\AppData\\Local" >&2
+  return 1
+}
 
 to_wsl_path() {
   local p="$1"
@@ -42,6 +51,8 @@ to_wsl_path() {
   return 1
 }
 
+WIN_LOCALAPPDATA="$(get_windows_local_app_data)"
+win_path="${WIN_LOCALAPPDATA}\\PManager\\bin\\native-host.exe"
 dest_exe="$(to_wsl_path "${win_path}")"
 dest_dir="$(dirname "${dest_exe}")"
 

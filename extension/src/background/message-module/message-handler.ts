@@ -18,16 +18,24 @@ export class MessageHandler extends Handler{
   }
 
   private initSendButtonListener(){
-    chrome.runtime.onMessage.addListener((request)=>{
+    chrome.runtime.onMessage.addListener((request,_sender,sendResponse)=>{
       if(!request||typeof request!=="object") return;
       if((request as any).kind!=="MESSAGE_SEND_BUTTON_CLICKED") return;
-      this.onMessageSendButtonClicked(request);
+      console.log("bg received MESSAGE_SEND_BUTTON_CLICKED");
+      this.onMessageSendButtonClicked(request)
+        .then(()=>sendResponse({ok: true}))
+        .catch((err)=>sendResponse({ok: false,error: String(err)}));
+      return true;
     });
 
-    chrome.runtime.onMessage.addListener((request)=>{
+    chrome.runtime.onMessage.addListener((request,_sender,sendResponse)=>{
       if(!request||typeof request!=="object") return;
       if((request as any).kind!=="MESSAGE_PROFILE_SEND_BUTTON_CLICKED") return;
-      this.onProfileSendButtonClicked(request);
+      console.log("bg received MESSAGE_PROFILE_SEND_BUTTON_CLICKED");
+      this.onProfileSendButtonClicked(request)
+        .then(()=>sendResponse({ok: true}))
+        .catch((err)=>sendResponse({ok: false,error: String(err)}));
+      return true;
     });
   }
 
@@ -55,10 +63,12 @@ export class MessageHandler extends Handler{
       })),
     };
 
+    console.log("send match messages payload to native host",payload);
     try{
       await this.sendToNativeHost(payload);
     }catch(err){
       console.error("failed to send messages payload",err);
+      throw err;
     }
   }
 
@@ -111,10 +121,12 @@ export class MessageHandler extends Handler{
           }
         : null,
     };
+    console.log("send match profile payload to native host",payload);
     try{
       await this.sendToNativeHost(payload);
     }catch(err){
       console.error("failed to send partner profile payload",err);
+      throw err;
     }
   }
 

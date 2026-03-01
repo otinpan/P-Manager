@@ -16,10 +16,14 @@ export class ProfileHandler extends Handler{
   }
 
   private initSendButtonListener(){
-    chrome.runtime.onMessage.addListener((request)=>{
+    chrome.runtime.onMessage.addListener((request,_sender,sendResponse)=>{
       if(!request||typeof request!=="object") return;
       if((request as any).kind!=="PROFILE_SEND_BUTTON_CLICKED") return;
-      this.onProfileSendButtonClicked(request);
+      console.log("bg received PROFILE_SEND_BUTTON_CLICKED");
+      this.onProfileSendButtonClicked(request)
+        .then(()=>sendResponse({ok: true}))
+        .catch((err)=>sendResponse({ok: false,error: String(err)}));
+      return true;
     });
   }
 
@@ -76,6 +80,7 @@ export class ProfileHandler extends Handler{
       await this.sendToNativeHost(payload);
     }catch(err){
       console.error("failed to send profile payload",err);
+      throw err;
     }
   }
 
