@@ -257,7 +257,7 @@ export class MessageThread{
     if(pre) pre.textContent = content;
     const button = panelBody.querySelector(`#${this.sendMessageButtonId}`) as HTMLButtonElement | null;
     if(!button) return;
-    button.addEventListener("click",()=>this.onSendButtonClick());
+    button.addEventListener("click",()=>this.onMessageSendButtonClick());
 
     this.sendButton = button;
   }
@@ -285,7 +285,7 @@ export class MessageThread{
     if(pre) pre.textContent = content;
     const button = panelBody.querySelector(`#${this.sendMessageButtonId}`) as HTMLButtonElement | null;
     if(!button) return;
-    button.addEventListener("click",()=>this.onSendButtonClick());
+    button.addEventListener("click",()=>this.onProfileSendButtonClick());
 
     this.sendButton = button;
   }
@@ -321,11 +321,23 @@ export class MessageThread{
     removeExtensionPanel(this.messagePanelId);
   }
 
-  private onSendButtonClick(){
+  private onMessageSendButtonClick(){
     chrome.runtime.sendMessage({
       kind: "MESSAGE_SEND_BUTTON_CLICKED",
       url: this.id,
       title: this.title,
+      data: this.threadItems,
+    }).catch(()=>{
+
+    });
+  }
+
+  private onProfileSendButtonClick(){
+    chrome.runtime.sendMessage({
+      kind: "MESSAGE_PROFILE_SEND_BUTTON_CLICKED",
+      url: this.id,
+      title: this.title,
+      data: this.matchInfo,
     }).catch(()=>{
 
     });

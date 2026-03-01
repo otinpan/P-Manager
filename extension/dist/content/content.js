@@ -397,7 +397,7 @@
           if (pre) pre.textContent = content;
           const button = panelBody.querySelector(`#${this.sendMessageButtonId}`);
           if (!button) return;
-          button.addEventListener("click", () => this.onSendButtonClick());
+          button.addEventListener("click", () => this.onMessageSendButtonClick());
           this.sendButton = button;
         }
         initProfilePane() {
@@ -418,7 +418,7 @@
           if (pre) pre.textContent = content;
           const button = panelBody.querySelector(`#${this.sendMessageButtonId}`);
           if (!button) return;
-          button.addEventListener("click", () => this.onSendButtonClick());
+          button.addEventListener("click", () => this.onProfileSendButtonClick());
           this.sendButton = button;
         }
         ensurePaneStyle() {
@@ -448,11 +448,21 @@
           this.activePane = null;
           removeExtensionPanel(this.messagePanelId);
         }
-        onSendButtonClick() {
+        onMessageSendButtonClick() {
           chrome.runtime.sendMessage({
             kind: "MESSAGE_SEND_BUTTON_CLICKED",
             url: this.id,
-            title: this.title
+            title: this.title,
+            data: this.threadItems
+          }).catch(() => {
+          });
+        }
+        onProfileSendButtonClick() {
+          chrome.runtime.sendMessage({
+            kind: "MESSAGE_PROFILE_SEND_BUTTON_CLICKED",
+            url: this.id,
+            title: this.title,
+            data: this.matchInfo
           }).catch(() => {
           });
         }
@@ -741,7 +751,8 @@
           chrome.runtime.sendMessage({
             kind: "PROFILE_SEND_BUTTON_CLICKED",
             url: this.id,
-            title: this.title
+            title: this.title,
+            data: this.myProfile
           }).catch(() => {
           });
         }

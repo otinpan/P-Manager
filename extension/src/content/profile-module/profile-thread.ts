@@ -121,6 +121,7 @@ export class ProfileThread{
       kind: "PROFILE_SEND_BUTTON_CLICKED",
       url: this.id,
       title: this.title,
+      data: this.myProfile,
     }).catch(()=>{
 
     });

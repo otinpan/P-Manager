@@ -1,10 +1,13 @@
 import{
-  NATIVE_HOST_NAME,
   PAGE_ID_MESSAGE,
   COMMANDS,
   GenericEvent,
+  Profile,
+  RESPONSE_TYPE,
+  MatchMessages,
+  MatchProfile,
 }from "../../types";
-
+import { ThreadMessage } from "../../content/message-module/message-thread";
 import { Handler } from "../handler";
 
 export class MessageHandler extends Handler{
@@ -18,12 +21,101 @@ export class MessageHandler extends Handler{
     chrome.runtime.onMessage.addListener((request)=>{
       if(!request||typeof request!=="object") return;
       if((request as any).kind!=="MESSAGE_SEND_BUTTON_CLICKED") return;
-      this.onSendButtonClicked(request);
+      this.onMessageSendButtonClicked(request);
+    });
+
+    chrome.runtime.onMessage.addListener((request)=>{
+      if(!request||typeof request!=="object") return;
+      if((request as any).kind!=="MESSAGE_PROFILE_SEND_BUTTON_CLICKED") return;
+      this.onProfileSendButtonClicked(request);
     });
   }
 
-  private onSendButtonClicked(_request: unknown){
-    // TODO: 送るボタンクリック時のイベント処理をここに実装
+  private async onMessageSendButtonClicked(request: unknown){
+    if(!request||typeof request!=="object") return;
+    if((request as any).kind!=="MESSAGE_SEND_BUTTON_CLICKED") return;
+
+    const result=request as any;
+    const partnerId = String(result.url ?? "");
+    const items = Array.isArray(result.data) ? (result.data as ThreadMessage[]) : [];
+    const updatedAt = new Date().toISOString();
+
+    const payload: MatchMessages = {
+      type: RESPONSE_TYPE.MATCH_MESSAGES,
+      partner: {
+        id: partnerId,
+        updated_at: updatedAt,
+      },
+      messages: items.map((item)=>({
+        id: item.id,
+        partner_id: partnerId,
+        sent_at: new Date(item.time).toISOString(),
+        is_mine: item.isMyMessage,
+        body: item.message,
+      })),
+    };
+
+    try{
+      await this.sendToNativeHost(payload);
+    }catch(err){
+      console.error("failed to send messages payload",err);
+    }
+  }
+
+  private async onProfileSendButtonClicked(request: unknown){
+    if(!request||typeof request!=="object") return;
+    if((request as any).kind!=="MESSAGE_PROFILE_SEND_BUTTON_CLICKED") return;
+
+    const result = request as any;
+    const partnerId = String(result.url ?? "");
+    const updatedAt = new Date().toISOString();
+    const profile = (result.data ?? null) as Profile | null;
+
+    const payload: MatchProfile = {
+      type: RESPONSE_TYPE.MATCH_PROFILE,
+      partner: {
+        id: partnerId,
+        updated_at: updatedAt,
+      },
+      partner_profile: profile
+        ? {
+            partner_id: partnerId,
+            name: profile.name,
+            age: profile.age,
+            height: profile.height,
+            figure: profile.figure,
+            bloodType: profile.bloodType,
+            brother: profile.brother,
+            residence: profile.residence,
+            hometown: profile.hometown,
+            jobCategory: profile.jobCategory,
+            educationalBackground: profile.educationalBackground,
+            annualIncom: profile.annualIncom,
+            smoking: profile.smoking,
+            schoolName: profile.schoolName,
+            jobName: profile.jobName,
+            maritalStatus: profile.maritalStatus,
+            hasKids: profile.hasKids,
+            marriageIntention: profile.marriageIntention,
+            kidsIntention: profile.kidsIntention,
+            houseworkAndChildcare: profile.houseworkAndChildcare,
+            preferredPace: profile.preferredPace,
+            costOfDate: profile.costOfDate,
+            character: profile.character,
+            sociality: profile.sociality,
+            roommate: profile.roommate,
+            holiday: profile.holiday,
+            alchole: profile.alchole,
+            hobbies: profile.hobbies,
+            selfIntroduction: profile.selfIntroduction,
+          }
+        : null,
+    };
+    try{
+      await this.sendToNativeHost(payload);
+    }catch(err){
+      console.error("failed to send partner profile payload",err);
+    }
   }
 
   public onGenericEvent(ev: GenericEvent){

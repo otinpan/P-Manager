@@ -49,6 +49,52 @@ export type GenericEvent={
   title?: string;
 }
 
+
 export enum RESPONSE_TYPE{
-  
+  MATCH_MESSAGES="MATCH_MESSAGES",
+  MATCH_PROFILE="MATCH_PROFILE",
+  MY_PROFILE="MY_PROFILE",
+}
+export type MessageToNativeHost =
+  | MatchMessages
+  | MatchProfile
+  | MyProfile;
+
+export type PartnerRow = {
+  id: string;
+  updated_at: string;
+};
+
+export type MessageRow = {
+  id: string;
+  partner_id: string;
+  sent_at: string;
+  is_mine: boolean;
+  body: string;
+};
+
+export type PartnerProfileRow = Profile & {
+  partner_id: string;
+};
+
+export type MyProfileRow = Profile & {
+  id: string;
+  updated_at: string;
+};
+
+export interface MatchMessages{
+  type: RESPONSE_TYPE.MATCH_MESSAGES;
+  partner: PartnerRow;
+  messages: MessageRow[];
+}
+
+export interface MatchProfile{
+  type: RESPONSE_TYPE.MATCH_PROFILE;
+  partner: PartnerRow;
+  partner_profile: PartnerProfileRow | null;
+}
+
+export interface MyProfile{
+  type: RESPONSE_TYPE.MY_PROFILE;
+  my_profile: MyProfileRow | null;
 }

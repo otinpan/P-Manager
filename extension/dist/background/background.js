@@ -124,10 +124,93 @@ var init_message_handler = __esm({
         chrome.runtime.onMessage.addListener((request) => {
           if (!request || typeof request !== "object") return;
           if (request.kind !== "MESSAGE_SEND_BUTTON_CLICKED") return;
-          this.onSendButtonClicked(request);
+          this.onMessageSendButtonClicked(request);
+        });
+        chrome.runtime.onMessage.addListener((request) => {
+          if (!request || typeof request !== "object") return;
+          if (request.kind !== "MESSAGE_PROFILE_SEND_BUTTON_CLICKED") return;
+          this.onProfileSendButtonClicked(request);
         });
       }
-      onSendButtonClicked(_request) {
+      async onMessageSendButtonClicked(request) {
+        if (!request || typeof request !== "object") return;
+        if (request.kind !== "MESSAGE_SEND_BUTTON_CLICKED") return;
+        const result = request;
+        const partnerId = String(result.url ?? "");
+        const items = Array.isArray(result.data) ? result.data : [];
+        const updatedAt = (/* @__PURE__ */ new Date()).toISOString();
+        const payload = {
+          type: "MATCH_MESSAGES" /* MATCH_MESSAGES */,
+          partner: {
+            id: partnerId,
+            updated_at: updatedAt
+          },
+          messages: items.map((item) => ({
+            id: item.id,
+            partner_id: partnerId,
+            sent_at: new Date(item.time).toISOString(),
+            is_mine: item.isMyMessage,
+            body: item.message
+          }))
+        };
+        console.log("sent match messages to native-host: ", payload);
+        try {
+          await this.sendToNativeHost(payload);
+        } catch (err) {
+          console.error("failed to send messages payload", err);
+        }
+      }
+      async onProfileSendButtonClicked(request) {
+        if (!request || typeof request !== "object") return;
+        if (request.kind !== "MESSAGE_PROFILE_SEND_BUTTON_CLICKED") return;
+        const result = request;
+        const partnerId = String(result.url ?? "");
+        const updatedAt = (/* @__PURE__ */ new Date()).toISOString();
+        const profile = result.data ?? null;
+        const payload = {
+          type: "MATCH_PROFILE" /* MATCH_PROFILE */,
+          partner: {
+            id: partnerId,
+            updated_at: updatedAt
+          },
+          partner_profile: profile ? {
+            partner_id: partnerId,
+            name: profile.name,
+            age: profile.age,
+            height: profile.height,
+            figure: profile.figure,
+            bloodType: profile.bloodType,
+            brother: profile.brother,
+            residence: profile.residence,
+            hometown: profile.hometown,
+            jobCategory: profile.jobCategory,
+            educationalBackground: profile.educationalBackground,
+            annualIncom: profile.annualIncom,
+            smoking: profile.smoking,
+            schoolName: profile.schoolName,
+            jobName: profile.jobName,
+            maritalStatus: profile.maritalStatus,
+            hasKids: profile.hasKids,
+            marriageIntention: profile.marriageIntention,
+            kidsIntention: profile.kidsIntention,
+            houseworkAndChildcare: profile.houseworkAndChildcare,
+            preferredPace: profile.preferredPace,
+            costOfDate: profile.costOfDate,
+            character: profile.character,
+            sociality: profile.sociality,
+            roommate: profile.roommate,
+            holiday: profile.holiday,
+            alchole: profile.alchole,
+            hobbies: profile.hobbies,
+            selfIntroduction: profile.selfIntroduction
+          } : null
+        };
+        console.log("sent match profile to native-host: ", payload);
+        try {
+          await this.sendToNativeHost(payload);
+        } catch (err) {
+          console.error("failed to send partner profile payload", err);
+        }
       }
       onGenericEvent(ev) {
         if ((ev.command === "messageOpen" /* MESSAGE_OPEN */ || ev.command === "partnerOpen" /* PARTNER_OPEN */) && ev.url) {
@@ -172,10 +255,57 @@ var init_profile_handler = __esm({
         chrome.runtime.onMessage.addListener((request) => {
           if (!request || typeof request !== "object") return;
           if (request.kind !== "PROFILE_SEND_BUTTON_CLICKED") return;
-          this.onSendButtonClicked(request);
+          this.onProfileSendButtonClicked(request);
         });
       }
-      onSendButtonClicked(_request) {
+      async onProfileSendButtonClicked(request) {
+        if (!request || typeof request !== "object") return;
+        if (request.kind !== "PROFILE_SEND_BUTTON_CLICKED") return;
+        const result = request;
+        const profileId = String(result.url ?? "");
+        const updatedAt = (/* @__PURE__ */ new Date()).toISOString();
+        const profile = result.data ?? null;
+        const payload = {
+          type: "MY_PROFILE" /* MY_PROFILE */,
+          my_profile: profile ? {
+            id: profileId,
+            updated_at: updatedAt,
+            name: profile.name,
+            age: profile.age,
+            height: profile.height,
+            figure: profile.figure,
+            bloodType: profile.bloodType,
+            brother: profile.brother,
+            residence: profile.residence,
+            hometown: profile.hometown,
+            jobCategory: profile.jobCategory,
+            educationalBackground: profile.educationalBackground,
+            annualIncom: profile.annualIncom,
+            smoking: profile.smoking,
+            schoolName: profile.schoolName,
+            jobName: profile.jobName,
+            maritalStatus: profile.maritalStatus,
+            hasKids: profile.hasKids,
+            marriageIntention: profile.marriageIntention,
+            kidsIntention: profile.kidsIntention,
+            houseworkAndChildcare: profile.houseworkAndChildcare,
+            preferredPace: profile.preferredPace,
+            costOfDate: profile.costOfDate,
+            character: profile.character,
+            sociality: profile.sociality,
+            roommate: profile.roommate,
+            holiday: profile.holiday,
+            alchole: profile.alchole,
+            hobbies: profile.hobbies,
+            selfIntroduction: profile.selfIntroduction
+          } : null
+        };
+        console.log("sent my profile to native-host: ", payload);
+        try {
+          await this.sendToNativeHost(payload);
+        } catch (err) {
+          console.error("failed to send profile payload", err);
+        }
       }
       onGenericEvent(ev) {
         if (ev.command === "profileOpen" /* PROFILE_OPEN */ && ev.url) {
