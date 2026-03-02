@@ -6,13 +6,18 @@ export type ExtensionPanelOptions = {
   defaultWidth?: number;
   minWidth?: number;
   maxWidth?: number;
+  onClose?: ()=>void;
+  onReopen?: ()=>void;
 };
 
 const PANEL_BODY_CLASS = "p-manager-extension-panel-body";
 const RESIZE_HANDLE_CLASS = "p-manager-extension-panel-resize";
+const CLOSE_BUTTON_CLASS = "p-manager-extension-panel-close";
+const REOPEN_BUTTON_CLASS = "p-manager-extension-panel-reopen";
 
 export function ensureExtensionPanel(options: ExtensionPanelOptions): HTMLElement {
   ensureExtensionPanelStyle(options);
+  hideReopenButton(options.sidebarId);
 
   let sidebar = document.getElementById(options.sidebarId) as HTMLElement | null;
   if (!sidebar) {
@@ -22,6 +27,7 @@ export function ensureExtensionPanel(options: ExtensionPanelOptions): HTMLElemen
       <div class="${RESIZE_HANDLE_CLASS}" aria-hidden="true"></div>
       <header>
         <h2>${options.title}</h2>
+        <button class="${CLOSE_BUTTON_CLASS}" type="button" aria-label="Close panel">×</button>
       </header>
       <section class="${PANEL_BODY_CLASS}"></section>
     `;
@@ -34,6 +40,7 @@ export function ensureExtensionPanel(options: ExtensionPanelOptions): HTMLElemen
   sidebar.style.width = `${clamp(width, minWidth, maxWidth)}px`;
 
   initResizeBehavior(sidebar, options);
+  initCloseBehavior(sidebar, options);
 
   const body = sidebar.querySelector(`.${PANEL_BODY_CLASS}`) as HTMLElement | null;
   if (!body) {
@@ -46,6 +53,11 @@ export function ensureExtensionPanel(options: ExtensionPanelOptions): HTMLElemen
 export function removeExtensionPanel(sidebarId: string): void {
   const sidebar = document.getElementById(sidebarId);
   sidebar?.remove();
+}
+
+export function removeExtensionPanelLauncher(sidebarId: string): void {
+  const reopenButton = document.getElementById(getReopenButtonId(sidebarId));
+  reopenButton?.remove();
 }
 
 function ensureExtensionPanelStyle(options: ExtensionPanelOptions): void {
@@ -72,6 +84,10 @@ function ensureExtensionPanelStyle(options: ExtensionPanelOptions): void {
       border-bottom: 1px solid #e2e8f0;
       background: #f1f5f9;
       padding: 12px 14px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
     }
 
     #${options.sidebarId} > header > h2 {
@@ -79,6 +95,44 @@ function ensureExtensionPanelStyle(options: ExtensionPanelOptions): void {
       font-size: 13px;
       font-weight: 700;
       color: #0f172a;
+    }
+
+    #${options.sidebarId} .${CLOSE_BUTTON_CLASS} {
+      border: 1px solid #cbd5e1;
+      border-radius: 9999px;
+      width: 24px;
+      height: 24px;
+      padding: 0;
+      line-height: 1;
+      font-size: 16px;
+      color: #334155;
+      background: #ffffff;
+      cursor: pointer;
+    }
+
+    #${options.sidebarId} .${CLOSE_BUTTON_CLASS}:hover {
+      background: #e2e8f0;
+    }
+
+    .${REOPEN_BUTTON_CLASS} {
+      position: fixed;
+      right: 10px;
+      top: 10%;
+      transform: translateY(-50%);
+      z-index: 999997;
+      border: 1px solid #cbd5e1;
+      border-radius: 10px;
+      padding: 8px 10px;
+      font-size: 12px;
+      font-weight: 700;
+      color: #0f172a;
+      background: #ffffff;
+      box-shadow: 0 4px 12px rgba(15, 23, 42, 0.2);
+      cursor: pointer;
+    }
+
+    .${REOPEN_BUTTON_CLASS}:hover {
+      background: #f1f5f9;
     }
 
     #${options.sidebarId} .${PANEL_BODY_CLASS} {
@@ -154,6 +208,50 @@ function initResizeBehavior(sidebar: HTMLElement, options: ExtensionPanelOptions
   });
 
   sidebar.dataset.resizeReady = "1";
+}
+
+function initCloseBehavior(sidebar: HTMLElement, options: ExtensionPanelOptions): void{
+  if(sidebar.dataset.closeReady === "1") return;
+  const closeButton = sidebar.querySelector(`.${CLOSE_BUTTON_CLASS}`) as HTMLButtonElement | null;
+  if(!closeButton) return;
+
+  closeButton.addEventListener("click",()=>{
+    removeExtensionPanel(options.sidebarId);
+    ensureReopenButton(options);
+    options.onClose?.();
+  });
+
+  sidebar.dataset.closeReady = "1";
+}
+
+function ensureReopenButton(options: ExtensionPanelOptions): void{
+  if(!options.onReopen) return;
+
+  const buttonId = getReopenButtonId(options.sidebarId);
+  let button = document.getElementById(buttonId) as HTMLButtonElement | null;
+  if(!button){
+    button = document.createElement("button");
+    button.id = buttonId;
+    button.type = "button";
+    button.className = REOPEN_BUTTON_CLASS;
+    button.textContent = `${options.title} を再表示`;
+    document.body.appendChild(button);
+  }
+
+  button.style.display = "block";
+  button.onclick = ()=>{
+    options.onReopen?.();
+  };
+}
+
+function hideReopenButton(sidebarId: string): void{
+  const button = document.getElementById(getReopenButtonId(sidebarId)) as HTMLButtonElement | null;
+  if(!button) return;
+  button.style.display = "none";
+}
+
+function getReopenButtonId(sidebarId: string): string{
+  return `${sidebarId}-reopen`;
 }
 
 function clamp(value: number, min: number, max: number): number {

@@ -1,6 +1,7 @@
 import {Profile} from "../../types"
+import {RESPONSE_TYPE} from "../../types"
 import {safeText} from "../message-module/message-thread"
-import { ensureExtensionPanel, removeExtensionPanel } from "../shared/extension-panel-view";
+import { ensureExtensionPanel, removeExtensionPanel, removeExtensionPanelLauncher } from "../shared/extension-panel-view";
 import { buildSendButtonCss, buildSendButtonHtml } from "../shared/send-button-view";
 export interface ThreadSelectors{
   container: string;
@@ -19,6 +20,8 @@ export const defaultSelectors: ThreadSelectors={
 export class ProfileThread{
   private myProfile: Profile | null=null;
   private myName: string | null=null;
+  private recommendedProfile: unknown = null;
+  private isProfileLoading = false;
   private isProfilePaneVisible = false;
   private sendButton: HTMLButtonElement | null = null;
   private readonly sendProfileButtonId = "p-manager-profile-send-button";
@@ -37,19 +40,38 @@ export class ProfileThread{
 
   init(){
     this.initProfile();
-    this.initListener();
   }
 
   reset(){
     this.myProfile=null;
+    this.recommendedProfile = null;
+    this.isProfileLoading = false;
     this.destroyProfilePane();
+  }
+
+  setNativeHostBody(body: unknown,source?: unknown,recommendedProfile?: unknown){
+    if(source===RESPONSE_TYPE.MY_PROFILE){
+      this.isProfileLoading = false;
+      const direct =
+        recommendedProfile ??
+        (
+          body &&
+          typeof body === "object" &&
+          "recommended_profile" in body
+            ? (body as { recommended_profile?: unknown }).recommended_profile
+            : null
+        );
+      if(direct!=null){
+        this.recommendedProfile = direct;
+      }
+    }
+    if(this.isProfilePaneVisible){
+      this.initProfilePane();
+    }
   }
 
   private getThreadContainer(){
     return document.querySelector(this.selectors.container) as HTMLElement | null;
-  }
-  private initListener(){
-
   }
 
   initMessagePane(){
@@ -69,18 +91,36 @@ export class ProfileThread{
       defaultWidth: 320,
       minWidth: 260,
       maxWidth: 700,
+      onClose: ()=>{
+        this.sendButton = null;
+        this.isProfilePaneVisible = false;
+      },
+      onReopen: ()=>{
+        this.initProfilePane();
+      },
     });
 
-    const profileText =
-      this.myProfile == null
-        ? "profileInfo: null"
-        : JSON.stringify(this.myProfile,null,2);
-    panelBody.innerHTML = `<div>Profile Page</div><pre></pre>${buildSendButtonHtml(this.sendProfileButtonId)}`;
-    const pre = panelBody.querySelector("pre");
-    if(pre) pre.textContent = profileText;
+    panelBody.innerHTML = `
+      <div>Profile Page</div>
+      <div class="p-manager-profile-list">
+        <article class="p-manager-profile-card">
+          <p class="p-manager-profile-card-title">My Profile</p>
+          <div class="p-manager-profile-rows"></div>
+        </article>
+        <article class="p-manager-profile-card">
+          <p class="p-manager-profile-card-title">Recommended Profile</p>
+          <div class="p-manager-recommended-profile-body"></div>
+        </article>
+      </div>
+      ${buildSendButtonHtml(this.sendProfileButtonId)}
+    `;
+    this.renderMyProfile(panelBody);
+    this.renderRecommendedProfile(panelBody);
     const button = panelBody.querySelector(`#${this.sendProfileButtonId}`) as HTMLButtonElement | null;
     if(!button) return;
     button.addEventListener("click",()=>this.onSendButtonClick());
+    button.disabled = this.isProfileLoading;
+    button.textContent = this.isProfileLoading ? "生成中..." : "生成";
 
     this.sendButton = button;
   }
@@ -91,12 +131,51 @@ export class ProfileThread{
     const style = document.createElement("style");
     style.id = this.sendProfileButtonStyleId;
     style.textContent = `
-      #${this.profilePanelId} pre {
-        margin: 0;
+      #${this.profilePanelId} .p-manager-profile-list {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
+      #${this.profilePanelId} .p-manager-profile-card {
+        border: 1px solid #cbd5e1;
+        border-radius: 10px;
+        background: #ffffff;
         padding: 10px;
+        box-shadow: 0 1px 2px rgba(15,23,42,0.08);
+      }
+      #${this.profilePanelId} .p-manager-profile-card-title {
+        margin: 0 0 8px;
+        font-size: 12px;
+        font-weight: 700;
+        color: #334155;
+      }
+      #${this.profilePanelId} .p-manager-profile-rows {
+        display: grid;
+        gap: 6px;
+      }
+      #${this.profilePanelId} .p-manager-profile-row {
+        display: grid;
+        grid-template-columns: 170px 1fr;
+        gap: 8px;
+        align-items: start;
+        font-size: 12px;
+        line-height: 1.4;
+      }
+      #${this.profilePanelId} .p-manager-profile-row-label {
+        color: #475569;
+        font-weight: 700;
+      }
+      #${this.profilePanelId} .p-manager-profile-row-value {
+        color: #0f172a;
+        white-space: pre-wrap;
+        overflow-wrap: anywhere;
+      }
+      #${this.profilePanelId} .p-manager-recommended-profile-body {
+        margin: 0;
+        padding: 8px;
         border: 1px solid #cbd5e1;
         border-radius: 8px;
-        background: #ffffff;
+        background: #f8fafc;
         color: #0f172a;
         font-size: 12px;
         line-height: 1.4;
@@ -109,21 +188,94 @@ export class ProfileThread{
     document.head.appendChild(style);
   }
 
+  private renderMyProfile(panelBody: HTMLElement){
+    const root = panelBody.querySelector(".p-manager-profile-rows") as HTMLElement | null;
+    if(!root) return;
+
+    if(this.myProfile==null){
+      const empty = document.createElement("p");
+      empty.textContent = "自己紹介文を提案します";
+      root.appendChild(empty);
+      return;
+    }
+
+    const rows = Object.entries(this.myProfile)
+      .filter(([,value])=>value!=null && String(value).trim().length>0);
+
+    if(rows.length===0){
+      const empty = document.createElement("p");
+      empty.textContent = "表示できるプロフィール項目がありません。";
+      root.appendChild(empty);
+      return;
+    }
+
+    rows.forEach(([key,value])=>{
+      const row = document.createElement("div");
+      row.className = "p-manager-profile-row";
+
+      const label = document.createElement("div");
+      label.className = "p-manager-profile-row-label";
+      label.textContent = key;
+
+      const body = document.createElement("div");
+      body.className = "p-manager-profile-row-value";
+      body.textContent = String(value);
+
+      row.appendChild(label);
+      row.appendChild(body);
+      root.appendChild(row);
+    });
+  }
+
+  private renderRecommendedProfile(panelBody: HTMLElement){
+    const body = panelBody.querySelector(".p-manager-recommended-profile-body") as HTMLElement | null;
+    if(!body) return;
+
+    if(this.recommendedProfile==null){
+      body.textContent = this.isProfileLoading
+        ? "recommended_profile を生成中です..."
+        : "プロフィールを提案します";
+      return;
+    }
+
+    if(typeof this.recommendedProfile==="string"){
+      body.textContent = this.recommendedProfile;
+      return;
+    }
+
+    body.textContent = JSON.stringify(this.recommendedProfile,null,2);
+  }
+
   private destroyProfilePane(){
     this.sendButton?.remove();
     this.sendButton = null;
     this.isProfilePaneVisible = false;
     removeExtensionPanel(this.profilePanelId);
+    removeExtensionPanelLauncher(this.profilePanelId);
   }
 
   private onSendButtonClick(){
+    if(this.isProfileLoading) return;
+    this.isProfileLoading = true;
+    if(this.isProfilePaneVisible){
+      this.initProfilePane();
+    }
     chrome.runtime.sendMessage({
       kind: "PROFILE_SEND_BUTTON_CLICKED",
       url: this.id,
       title: this.title,
       data: this.myProfile,
+    }).then((res: any)=>{
+      if(res?.ok) return;
+      this.isProfileLoading = false;
+      if(this.isProfilePaneVisible){
+        this.initProfilePane();
+      }
     }).catch(()=>{
-
+      this.isProfileLoading = false;
+      if(this.isProfilePaneVisible){
+        this.initProfilePane();
+      }
     });
   }
 

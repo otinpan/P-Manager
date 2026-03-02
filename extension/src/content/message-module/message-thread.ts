@@ -1,5 +1,6 @@
 import { Profile } from "../../types";
-import { ensureExtensionPanel, removeExtensionPanel } from "../shared/extension-panel-view";
+import { RESPONSE_TYPE } from "../../types";
+import { ensureExtensionPanel, removeExtensionPanel, removeExtensionPanelLauncher } from "../shared/extension-panel-view";
 import { buildSendButtonCss, buildSendButtonHtml } from "../shared/send-button-view";
 
 export interface ThreadMessage{
@@ -169,7 +170,12 @@ export class MessageThread{
   private seenIds=new Set<string>();
   private matchInfo: Profile | null=null;
   private matchName: string | null=null;
+  private nativeHostBody: unknown[] = [];
+  private recommendedStrategy: unknown = null;
+  private isMessageLoading = false;
+  private isProfileLoading = false;
   private activePane: "message" | "profile" | null = null;
+  private lastClosedPane: "message" | "profile" | null = null;
   private sendButton: HTMLButtonElement | null = null;
   private readonly sendMessageButtonId = "p-manager-message-send-button";
   private readonly sendMessageButtonStyleId = "p-manager-message-send-style";
@@ -187,17 +193,12 @@ export class MessageThread{
 
   init(){
     this.initPageObserver();
-    this.initListener();
   }
 
   private getThreadContainer(): HTMLElement | null{
     return document.querySelector(this.selectors.container) as HTMLElement | null;
   }
 
-  // backgroundからのメッセージを受信
-  initListener(){
-
-  }
 
   // PageObserverの作成
   initPageObserver(){
@@ -231,7 +232,39 @@ export class MessageThread{
     this.destroyPageObserver();
     this.destroyThreadItems();
     this.matchInfo=null;
+    this.nativeHostBody = [];
+    this.recommendedStrategy = null;
+    this.isMessageLoading = false;
+    this.isProfileLoading = false;
     this.destroyPane();
+  }
+
+  setNativeHostBody(body: unknown,source?: unknown,recommendedStrategy?: unknown){
+    if(source===RESPONSE_TYPE.MATCH_MESSAGES){
+      this.nativeHostBody.push(body);
+      this.isMessageLoading = false;
+    }
+    if(source===RESPONSE_TYPE.MATCH_PROFILE){
+      this.isProfileLoading = false;
+      const direct =
+        recommendedStrategy ??
+        (
+          body &&
+          typeof body === "object" &&
+          "recommended_strategy" in body
+            ? (body as { recommended_strategy?: unknown }).recommended_strategy
+            : null
+        );
+      if(direct!=null){
+        this.recommendedStrategy = direct;
+      }
+    }
+    if(this.activePane==="message"){
+      this.initMessagePane();
+    }
+    if(this.activePane==="profile"){
+      this.initProfilePane();
+    }
   }
 
   initMessagePane(){
@@ -246,18 +279,31 @@ export class MessageThread{
       defaultWidth: 320,
       minWidth: 260,
       maxWidth: 700,
+      onClose: ()=>{
+        this.lastClosedPane = this.activePane;
+        this.sendButton = null;
+        this.activePane = null;
+      },
+      onReopen: ()=>{
+        if(this.lastClosedPane==="profile"){
+          this.initProfilePane();
+          return;
+        }
+        this.initMessagePane();
+      },
     });
 
-    const content =
-      this.threadItems.length === 0
-        ? "threadItems: []"
-        : JSON.stringify(this.threadItems,null,2);
-    panelBody.innerHTML = `<div>Message Page</div><pre></pre>${buildSendButtonHtml(this.sendMessageButtonId)}`;
-    const pre = panelBody.querySelector("pre");
-    if(pre) pre.textContent = content;
+    panelBody.innerHTML = `
+      <div>Message Page</div>
+      <div class="p-manager-response-list"></div>
+      ${buildSendButtonHtml(this.sendMessageButtonId)}
+    `;
+    this.renderMessageResponseCards(panelBody);
     const button = panelBody.querySelector(`#${this.sendMessageButtonId}`) as HTMLButtonElement | null;
     if(!button) return;
     button.addEventListener("click",()=>this.onMessageSendButtonClick());
+    button.disabled = this.isMessageLoading;
+    button.textContent = this.isMessageLoading ? "生成中..." : "生成";
 
     this.sendButton = button;
   }
@@ -274,18 +320,41 @@ export class MessageThread{
       defaultWidth: 320,
       minWidth: 260,
       maxWidth: 700,
+      onClose: ()=>{
+        this.lastClosedPane = this.activePane;
+        this.sendButton = null;
+        this.activePane = null;
+      },
+      onReopen: ()=>{
+        if(this.lastClosedPane==="profile"){
+          this.initProfilePane();
+          return;
+        }
+        this.initMessagePane();
+      },
     });
 
-    const content =
-      this.matchInfo == null
-        ? "matchInfo: null"
-        : JSON.stringify(this.matchInfo,null,2);
-    panelBody.innerHTML = `<div>Profile Page</div><pre></pre>${buildSendButtonHtml(this.sendMessageButtonId)}`;
-    const pre = panelBody.querySelector("pre");
-    if(pre) pre.textContent = content;
+    panelBody.innerHTML = `
+      <div>Profile Page</div>
+      <div class="p-manager-response-list">
+        <article class="p-manager-response-card p-manager-profile-card">
+          <p class="p-manager-response-card-title">Profile</p>
+          <div class="p-manager-profile-rows"></div>
+        </article>
+        <article class="p-manager-response-card">
+          <p class="p-manager-response-card-title">Recommended Strategy</p>
+          <p class="p-manager-response-card-body p-manager-strategy-body"></p>
+        </article>
+      </div>
+      ${buildSendButtonHtml(this.sendMessageButtonId)}
+    `;
+    this.renderProfileSummary(panelBody);
+    this.renderRecommendedStrategy(panelBody);
     const button = panelBody.querySelector(`#${this.sendMessageButtonId}`) as HTMLButtonElement | null;
     if(!button) return;
     button.addEventListener("click",()=>this.onProfileSendButtonClick());
+    button.disabled = this.isProfileLoading;
+    button.textContent = this.isProfileLoading ? "生成中..." : "生成";
 
     this.sendButton = button;
   }
@@ -308,38 +377,268 @@ export class MessageThread{
         white-space: pre-wrap;
         overflow-wrap: anywhere;
       }
+      #${this.messagePanelId} .p-manager-response-list {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
+      #${this.messagePanelId} .p-manager-response-card {
+        border: 1px solid #cbd5e1;
+        border-radius: 10px;
+        background: #ffffff;
+        padding: 10px;
+        box-shadow: 0 1px 2px rgba(15,23,42,0.08);
+      }
+      #${this.messagePanelId} .p-manager-response-card-title {
+        margin: 0 0 6px;
+        font-size: 12px;
+        font-weight: 700;
+        color: #334155;
+      }
+      #${this.messagePanelId} .p-manager-response-card-body {
+        margin: 0;
+        color: #0f172a;
+        font-size: 13px;
+        line-height: 1.6;
+        white-space: pre-wrap;
+        overflow-wrap: anywhere;
+      }
+      #${this.messagePanelId} .p-manager-profile-rows {
+        display: grid;
+        gap: 6px;
+      }
+      #${this.messagePanelId} .p-manager-profile-row {
+        display: grid;
+        grid-template-columns: 170px 1fr;
+        gap: 8px;
+        align-items: start;
+        font-size: 12px;
+        line-height: 1.4;
+      }
+      #${this.messagePanelId} .p-manager-profile-row-label {
+        color: #475569;
+        font-weight: 700;
+      }
+      #${this.messagePanelId} .p-manager-profile-row-value {
+        color: #0f172a;
+        white-space: pre-wrap;
+        overflow-wrap: anywhere;
+      }
+      #${this.messagePanelId} .p-manager-response-card pre {
+        margin: 0;
+        padding: 8px;
+        border: 1px solid #e2e8f0;
+        border-radius: 8px;
+        background: #f8fafc;
+        color: #0f172a;
+        font-size: 12px;
+        line-height: 1.4;
+        white-space: pre-wrap;
+        overflow-wrap: anywhere;
+      }
       ${buildSendButtonCss(this.sendMessageButtonId,"#0d9488","#0f766e")}
     `;
 
     document.head.appendChild(style);
   }
 
+  private renderMessageResponseCards(panelBody: HTMLElement){
+    const list = panelBody.querySelector(".p-manager-response-list") as HTMLElement | null;
+    if(!list) return;
+
+    const cards: Array<{ title: string; text: string }> = [];
+    this.nativeHostBody.forEach((response,index)=>{
+      const messages = this.extractRecommendedMessages(response);
+      messages.forEach((text,messageIndex)=>{
+        cards.push({
+          title:
+            messages.length === 1
+              ? `Recommended Message ${index + 1}`
+              : `Recommended Message ${index + 1}-${messageIndex + 1}`,
+          text,
+        });
+      });
+    });
+
+    if(cards.length===0){
+      const card = document.createElement("article");
+      card.className = "p-manager-response-card";
+      card.innerHTML = `
+        <p class="p-manager-response-card-title">Recommended Message</p>
+        <p class="p-manager-response-card-body">${
+          this.isMessageLoading
+            ? "recommended_message を生成中です..."
+            : "メッセージを作ってもらいましょう"
+        }</p>
+      `;
+      list.appendChild(card);
+      return;
+    }
+
+    cards.forEach((cardData)=>{
+      const card = document.createElement("article");
+      card.className = "p-manager-response-card";
+
+      const title = document.createElement("p");
+      title.className = "p-manager-response-card-title";
+      title.textContent = cardData.title;
+
+      const body = document.createElement("p");
+      body.className = "p-manager-response-card-body";
+      body.textContent = cardData.text;
+
+      card.appendChild(title);
+      card.appendChild(body);
+      list.appendChild(card);
+    });
+  }
+
+  private renderProfileSummary(panelBody: HTMLElement){
+    const root = panelBody.querySelector(".p-manager-profile-rows") as HTMLElement | null;
+    if(!root) return;
+
+    if(this.matchInfo==null){
+      const empty = document.createElement("p");
+      empty.className = "p-manager-response-card-body";
+      empty.textContent = "プロフィールがまだ取得できていません。";
+      root.appendChild(empty);
+      return;
+    }
+
+    const rows = Object.entries(this.matchInfo)
+      .filter(([,value])=>value!=null && String(value).trim().length>0);
+
+    if(rows.length===0){
+      const empty = document.createElement("p");
+      empty.className = "p-manager-response-card-body";
+      empty.textContent = "表示できるプロフィール項目がありません。";
+      root.appendChild(empty);
+      return;
+    }
+
+    rows.forEach(([key,value])=>{
+      const row = document.createElement("div");
+      row.className = "p-manager-profile-row";
+
+      const label = document.createElement("div");
+      label.className = "p-manager-profile-row-label";
+      label.textContent = key;
+
+      const body = document.createElement("div");
+      body.className = "p-manager-profile-row-value";
+      body.textContent = String(value);
+
+      row.appendChild(label);
+      row.appendChild(body);
+      root.appendChild(row);
+    });
+  }
+
+  private renderRecommendedStrategy(panelBody: HTMLElement){
+    const body = panelBody.querySelector(".p-manager-strategy-body") as HTMLElement | null;
+    if(!body) return;
+
+    if(this.recommendedStrategy==null){
+      body.textContent = this.isProfileLoading
+        ? "recommended_strategy を生成中です..."
+        : "相手にあった戦略を考えます";
+      return;
+    }
+
+    if(typeof this.recommendedStrategy==="string"){
+      body.textContent = this.recommendedStrategy;
+      return;
+    }
+
+    body.textContent = JSON.stringify(this.recommendedStrategy,null,2);
+  }
+
+  private extractRecommendedMessages(response: unknown): string[]{
+    const source =
+      response &&
+      typeof response === "object" &&
+      "recommended_message" in response
+        ? (response as { recommended_message?: unknown }).recommended_message
+        : null;
+    if(source == null) return [];
+
+    const flatten = (value: unknown): string[] => {
+      if(value == null) return [];
+      if(typeof value === "string"){
+        const trimmed = value.trim();
+        return trimmed.length === 0 ? [] : [trimmed];
+      }
+      if(Array.isArray(value)){
+        return value.flatMap((entry)=>flatten(entry));
+      }
+      if(typeof value === "object"){
+        if("body" in value){
+          return flatten((value as { body?: unknown }).body);
+        }
+        return [JSON.stringify(value,null,2)];
+      }
+      return [String(value)];
+    };
+
+    return flatten(source);
+  }
+
   private destroyPane(){
     this.sendButton?.remove();
     this.sendButton = null;
     this.activePane = null;
+    this.lastClosedPane = null;
     removeExtensionPanel(this.messagePanelId);
+    removeExtensionPanelLauncher(this.messagePanelId);
   }
 
   private onMessageSendButtonClick(){
+    if(this.isMessageLoading) return;
+    this.isMessageLoading = true;
+    if(this.activePane==="message"){
+      this.initMessagePane();
+    }
     chrome.runtime.sendMessage({
       kind: "MESSAGE_SEND_BUTTON_CLICKED",
       url: this.id,
       title: this.title,
       data: this.threadItems,
+    }).then((res: any)=>{
+      if(res?.ok) return;
+      this.isMessageLoading = false;
+      if(this.activePane==="message"){
+        this.initMessagePane();
+      }
     }).catch(()=>{
-
+      this.isMessageLoading = false;
+      if(this.activePane==="message"){
+        this.initMessagePane();
+      }
     });
   }
 
   private onProfileSendButtonClick(){
+    if(this.isProfileLoading) return;
+    this.isProfileLoading = true;
+    if(this.activePane==="profile"){
+      this.initProfilePane();
+    }
     chrome.runtime.sendMessage({
       kind: "MESSAGE_PROFILE_SEND_BUTTON_CLICKED",
       url: this.id,
       title: this.title,
       data: this.matchInfo,
+    }).then((res: any)=>{
+      if(res?.ok) return;
+      this.isProfileLoading = false;
+      if(this.activePane==="profile"){
+        this.initProfilePane();
+      }
     }).catch(()=>{
-
+      this.isProfileLoading = false;
+      if(this.activePane==="profile"){
+        this.initProfilePane();
+      }
     });
   }
 

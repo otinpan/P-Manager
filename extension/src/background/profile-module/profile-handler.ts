@@ -16,18 +16,18 @@ export class ProfileHandler extends Handler{
   }
 
   private initSendButtonListener(){
-    chrome.runtime.onMessage.addListener((request,_sender,sendResponse)=>{
+    chrome.runtime.onMessage.addListener((request,sender,sendResponse)=>{
       if(!request||typeof request!=="object") return;
       if((request as any).kind!=="PROFILE_SEND_BUTTON_CLICKED") return;
       console.log("bg received PROFILE_SEND_BUTTON_CLICKED");
-      this.onProfileSendButtonClicked(request)
+      this.onProfileSendButtonClicked(request,sender.tab?.id)
         .then(()=>sendResponse({ok: true}))
         .catch((err)=>sendResponse({ok: false,error: String(err)}));
       return true;
     });
   }
 
-  private async onProfileSendButtonClicked(request: unknown){
+  private async onProfileSendButtonClicked(request: unknown,tabId?: number){
     if(!request||typeof request!=="object") return;
     if((request as any).kind!=="PROFILE_SEND_BUTTON_CLICKED") return;
 
@@ -77,11 +77,41 @@ export class ProfileHandler extends Handler{
     console.log("sent my profile to native-host: ",payload);
 
     try{
-      await this.sendToNativeHost(payload);
+      const resp=await this.sendToNativeHost(payload);
+      const normalizedBody = this.normalizeNativeResponseBody(resp);
+      if(typeof tabId==="number"){
+        chrome.tabs.sendMessage(tabId,{
+          kind: "PROFILE_NATIVE_BODY_RECEIVED",
+          url: profileId,
+          source: RESPONSE_TYPE.MY_PROFILE,
+          body: normalizedBody,
+          recommendedProfile: this.extractRecommendedProfile(resp,normalizedBody),
+        }).catch(()=>{
+
+        });
+      }
     }catch(err){
       console.error("failed to send profile payload",err);
       throw err;
     }
+  }
+
+  private extractRecommendedProfile(rawResponse: unknown,normalizedBody: unknown): unknown{
+    if(
+      rawResponse &&
+      typeof rawResponse === "object" &&
+      "recommended_profile" in rawResponse
+    ){
+      return (rawResponse as { recommended_profile?: unknown }).recommended_profile ?? null;
+    }
+    if(
+      normalizedBody &&
+      typeof normalizedBody === "object" &&
+      "recommended_profile" in normalizedBody
+    ){
+      return (normalizedBody as { recommended_profile?: unknown }).recommended_profile ?? null;
+    }
+    return null;
   }
 
   public onGenericEvent(ev: GenericEvent){

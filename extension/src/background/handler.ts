@@ -29,6 +29,27 @@ export abstract class Handler{
     })
   }
 
+  protected normalizeNativeResponseBody(response: unknown): unknown{
+    if(response==null) return null;
+
+    const payload =
+      typeof response === "object" &&
+      response !== null &&
+      "body" in response
+        ? (response as { body?: unknown }).body
+        : response;
+
+    if(typeof payload!=="string") return payload ?? null;
+    const trimmed = payload.trim();
+    if(trimmed.length===0) return "";
+
+    try{
+      return JSON.parse(trimmed);
+    }catch{
+      return payload;
+    }
+  }
+
   protected setEnabled(enabled: boolean){
     chrome.contextMenus.update(this.pageId,{enabled},()=>void chrome.runtime.lastError);
   }

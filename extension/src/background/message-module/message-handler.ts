@@ -18,28 +18,28 @@ export class MessageHandler extends Handler{
   }
 
   private initSendButtonListener(){
-    chrome.runtime.onMessage.addListener((request,_sender,sendResponse)=>{
+    chrome.runtime.onMessage.addListener((request,sender,sendResponse)=>{
       if(!request||typeof request!=="object") return;
       if((request as any).kind!=="MESSAGE_SEND_BUTTON_CLICKED") return;
       console.log("bg received MESSAGE_SEND_BUTTON_CLICKED");
-      this.onMessageSendButtonClicked(request)
+      this.onMessageSendButtonClicked(request,sender.tab?.id)
         .then(()=>sendResponse({ok: true}))
         .catch((err)=>sendResponse({ok: false,error: String(err)}));
       return true;
     });
 
-    chrome.runtime.onMessage.addListener((request,_sender,sendResponse)=>{
+    chrome.runtime.onMessage.addListener((request,sender,sendResponse)=>{
       if(!request||typeof request!=="object") return;
       if((request as any).kind!=="MESSAGE_PROFILE_SEND_BUTTON_CLICKED") return;
       console.log("bg received MESSAGE_PROFILE_SEND_BUTTON_CLICKED");
-      this.onProfileSendButtonClicked(request)
+      this.onProfileSendButtonClicked(request,sender.tab?.id)
         .then(()=>sendResponse({ok: true}))
         .catch((err)=>sendResponse({ok: false,error: String(err)}));
       return true;
     });
   }
 
-  private async onMessageSendButtonClicked(request: unknown){
+  private async onMessageSendButtonClicked(request: unknown,tabId?: number){
     if(!request||typeof request!=="object") return;
     if((request as any).kind!=="MESSAGE_SEND_BUTTON_CLICKED") return;
 
@@ -65,14 +65,24 @@ export class MessageHandler extends Handler{
 
     console.log("send match messages payload to native host",payload);
     try{
-      await this.sendToNativeHost(payload);
+      const resp=await this.sendToNativeHost(payload);
+      if(typeof tabId==="number"){
+        chrome.tabs.sendMessage(tabId,{
+          kind: "MESSAGE_NATIVE_BODY_RECEIVED",
+          url: partnerId,
+          source: RESPONSE_TYPE.MATCH_MESSAGES,
+          body: this.normalizeNativeResponseBody(resp),
+        }).catch(()=>{
+
+        });
+      }
     }catch(err){
       console.error("failed to send messages payload",err);
       throw err;
     }
   }
 
-  private async onProfileSendButtonClicked(request: unknown){
+  private async onProfileSendButtonClicked(request: unknown,tabId?: number){
     if(!request||typeof request!=="object") return;
     if((request as any).kind!=="MESSAGE_PROFILE_SEND_BUTTON_CLICKED") return;
 
@@ -123,11 +133,41 @@ export class MessageHandler extends Handler{
     };
     console.log("send match profile payload to native host",payload);
     try{
-      await this.sendToNativeHost(payload);
+      const resp=await this.sendToNativeHost(payload);
+      const normalizedBody = this.normalizeNativeResponseBody(resp);
+      if(typeof tabId==="number"){
+        chrome.tabs.sendMessage(tabId,{
+          kind: "MESSAGE_NATIVE_BODY_RECEIVED",
+          url: partnerId,
+          source: RESPONSE_TYPE.MATCH_PROFILE,
+          body: normalizedBody,
+          recommendedStrategy: this.extractRecommendedStrategy(resp,normalizedBody),
+        }).catch(()=>{
+
+        });
+      }
     }catch(err){
       console.error("failed to send partner profile payload",err);
       throw err;
     }
+  }
+
+  private extractRecommendedStrategy(rawResponse: unknown,normalizedBody: unknown): unknown{
+    if(
+      rawResponse &&
+      typeof rawResponse === "object" &&
+      "recommended_strategy" in rawResponse
+    ){
+      return (rawResponse as { recommended_strategy?: unknown }).recommended_strategy ?? null;
+    }
+    if(
+      normalizedBody &&
+      typeof normalizedBody === "object" &&
+      "recommended_strategy" in normalizedBody
+    ){
+      return (normalizedBody as { recommended_strategy?: unknown }).recommended_strategy ?? null;
+    }
+    return null;
   }
 
   public onGenericEvent(ev: GenericEvent){

@@ -100,6 +100,18 @@ var init_handler = __esm({
           });
         });
       }
+      normalizeNativeResponseBody(response) {
+        if (response == null) return null;
+        const payload = typeof response === "object" && response !== null && "body" in response ? response.body : response;
+        if (typeof payload !== "string") return payload ?? null;
+        const trimmed = payload.trim();
+        if (trimmed.length === 0) return "";
+        try {
+          return JSON.parse(trimmed);
+        } catch {
+          return payload;
+        }
+      }
       setEnabled(enabled) {
         chrome.contextMenus.update(this.pageId, { enabled }, () => void chrome.runtime.lastError);
       }
@@ -121,22 +133,22 @@ var init_message_handler = __esm({
         this.initSendButtonListener();
       }
       initSendButtonListener() {
-        chrome.runtime.onMessage.addListener((request, _sender, sendResponse) => {
+        chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
           if (!request || typeof request !== "object") return;
           if (request.kind !== "MESSAGE_SEND_BUTTON_CLICKED") return;
           console.log("bg received MESSAGE_SEND_BUTTON_CLICKED");
-          this.onMessageSendButtonClicked(request).then(() => sendResponse({ ok: true })).catch((err) => sendResponse({ ok: false, error: String(err) }));
+          this.onMessageSendButtonClicked(request, sender.tab?.id).then(() => sendResponse({ ok: true })).catch((err) => sendResponse({ ok: false, error: String(err) }));
           return true;
         });
-        chrome.runtime.onMessage.addListener((request, _sender, sendResponse) => {
+        chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
           if (!request || typeof request !== "object") return;
           if (request.kind !== "MESSAGE_PROFILE_SEND_BUTTON_CLICKED") return;
           console.log("bg received MESSAGE_PROFILE_SEND_BUTTON_CLICKED");
-          this.onProfileSendButtonClicked(request).then(() => sendResponse({ ok: true })).catch((err) => sendResponse({ ok: false, error: String(err) }));
+          this.onProfileSendButtonClicked(request, sender.tab?.id).then(() => sendResponse({ ok: true })).catch((err) => sendResponse({ ok: false, error: String(err) }));
           return true;
         });
       }
-      async onMessageSendButtonClicked(request) {
+      async onMessageSendButtonClicked(request, tabId) {
         if (!request || typeof request !== "object") return;
         if (request.kind !== "MESSAGE_SEND_BUTTON_CLICKED") return;
         const result = request;
@@ -159,13 +171,22 @@ var init_message_handler = __esm({
         };
         console.log("send match messages payload to native host", payload);
         try {
-          await this.sendToNativeHost(payload);
+          const resp = await this.sendToNativeHost(payload);
+          if (typeof tabId === "number") {
+            chrome.tabs.sendMessage(tabId, {
+              kind: "MESSAGE_NATIVE_BODY_RECEIVED",
+              url: partnerId,
+              source: "MATCH_MESSAGES" /* MATCH_MESSAGES */,
+              body: this.normalizeNativeResponseBody(resp)
+            }).catch(() => {
+            });
+          }
         } catch (err) {
           console.error("failed to send messages payload", err);
           throw err;
         }
       }
-      async onProfileSendButtonClicked(request) {
+      async onProfileSendButtonClicked(request, tabId) {
         if (!request || typeof request !== "object") return;
         if (request.kind !== "MESSAGE_PROFILE_SEND_BUTTON_CLICKED") return;
         const result = request;
@@ -212,11 +233,31 @@ var init_message_handler = __esm({
         };
         console.log("send match profile payload to native host", payload);
         try {
-          await this.sendToNativeHost(payload);
+          const resp = await this.sendToNativeHost(payload);
+          const normalizedBody = this.normalizeNativeResponseBody(resp);
+          if (typeof tabId === "number") {
+            chrome.tabs.sendMessage(tabId, {
+              kind: "MESSAGE_NATIVE_BODY_RECEIVED",
+              url: partnerId,
+              source: "MATCH_PROFILE" /* MATCH_PROFILE */,
+              body: normalizedBody,
+              recommendedStrategy: this.extractRecommendedStrategy(resp, normalizedBody)
+            }).catch(() => {
+            });
+          }
         } catch (err) {
           console.error("failed to send partner profile payload", err);
           throw err;
         }
+      }
+      extractRecommendedStrategy(rawResponse, normalizedBody) {
+        if (rawResponse && typeof rawResponse === "object" && "recommended_strategy" in rawResponse) {
+          return rawResponse.recommended_strategy ?? null;
+        }
+        if (normalizedBody && typeof normalizedBody === "object" && "recommended_strategy" in normalizedBody) {
+          return normalizedBody.recommended_strategy ?? null;
+        }
+        return null;
       }
       onGenericEvent(ev) {
         if ((ev.command === "messageOpen" /* MESSAGE_OPEN */ || ev.command === "partnerOpen" /* PARTNER_OPEN */) && ev.url) {
@@ -258,15 +299,15 @@ var init_profile_handler = __esm({
         this.initSendButtonListener();
       }
       initSendButtonListener() {
-        chrome.runtime.onMessage.addListener((request, _sender, sendResponse) => {
+        chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
           if (!request || typeof request !== "object") return;
           if (request.kind !== "PROFILE_SEND_BUTTON_CLICKED") return;
           console.log("bg received PROFILE_SEND_BUTTON_CLICKED");
-          this.onProfileSendButtonClicked(request).then(() => sendResponse({ ok: true })).catch((err) => sendResponse({ ok: false, error: String(err) }));
+          this.onProfileSendButtonClicked(request, sender.tab?.id).then(() => sendResponse({ ok: true })).catch((err) => sendResponse({ ok: false, error: String(err) }));
           return true;
         });
       }
-      async onProfileSendButtonClicked(request) {
+      async onProfileSendButtonClicked(request, tabId) {
         if (!request || typeof request !== "object") return;
         if (request.kind !== "PROFILE_SEND_BUTTON_CLICKED") return;
         const result = request;
@@ -310,11 +351,31 @@ var init_profile_handler = __esm({
         };
         console.log("sent my profile to native-host: ", payload);
         try {
-          await this.sendToNativeHost(payload);
+          const resp = await this.sendToNativeHost(payload);
+          const normalizedBody = this.normalizeNativeResponseBody(resp);
+          if (typeof tabId === "number") {
+            chrome.tabs.sendMessage(tabId, {
+              kind: "PROFILE_NATIVE_BODY_RECEIVED",
+              url: profileId,
+              source: "MY_PROFILE" /* MY_PROFILE */,
+              body: normalizedBody,
+              recommendedProfile: this.extractRecommendedProfile(resp, normalizedBody)
+            }).catch(() => {
+            });
+          }
         } catch (err) {
           console.error("failed to send profile payload", err);
           throw err;
         }
+      }
+      extractRecommendedProfile(rawResponse, normalizedBody) {
+        if (rawResponse && typeof rawResponse === "object" && "recommended_profile" in rawResponse) {
+          return rawResponse.recommended_profile ?? null;
+        }
+        if (normalizedBody && typeof normalizedBody === "object" && "recommended_profile" in normalizedBody) {
+          return normalizedBody.recommended_profile ?? null;
+        }
+        return null;
       }
       onGenericEvent(ev) {
         if (ev.command === "profileOpen" /* PROFILE_OPEN */ && ev.url) {

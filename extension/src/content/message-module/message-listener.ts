@@ -14,6 +14,18 @@ export class MessageListener{
   listen(){
     chrome.runtime.onMessage.addListener((request,sender,sendResponse)=>{
       if(!request||typeof request !=="object")return;
+      if((request as any).kind==="MESSAGE_NATIVE_BODY_RECEIVED"){
+        const targetUrl = String((request as any).url ?? "");
+        const targetThread =
+          (targetUrl ? this.threads.get(targetUrl) : undefined) ??
+          this.activeThread;
+        targetThread?.setNativeHostBody(
+          (request as any).body ?? null,
+          (request as any).source,
+          (request as any).recommendedStrategy ?? null,
+        );
+        return;
+      }
       if((request as any).kind==="MESSAGE_STOP_OBSERVE"){
         this.activeThread?.reset();
         this.activeThread=null;
@@ -21,6 +33,7 @@ export class MessageListener{
       }
 
       if((request as any).kind==="MESSAGE_OPEN_PROFILE"){
+        this.activeThread?.reset();
         this.activeThread?.initMatchProfile(0);
         this.activeThread?.initProfilePane();
         return;
@@ -32,6 +45,7 @@ export class MessageListener{
       console.log("start message thread");
       const url=request.url;
       const title=request.title;
+
 
       if(!this.threads.has(url)){
         console.log("create new thread: url=",url);

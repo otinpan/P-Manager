@@ -1,5 +1,5 @@
 export function buildSendButtonHtml(buttonId: string): string {
-  return `<button id="${buttonId}" type="button">送る</button>`;
+  return `<button id="${buttonId}" type="button">自動生成</button>`;
 }
 
 export function buildSendButtonCss(buttonId: string, baseColor: string, hoverColor: string): string {

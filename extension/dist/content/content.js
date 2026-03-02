@@ -8,9 +8,17 @@
     return mod || (0, cb[__getOwnPropNames(cb)[0]])((mod = { exports: {} }).exports, mod), mod.exports;
   };
 
+  // types.ts
+  var init_types = __esm({
+    "types.ts"() {
+      "use strict";
+    }
+  });
+
   // content/shared/extension-panel-view.ts
   function ensureExtensionPanel(options) {
     ensureExtensionPanelStyle(options);
+    hideReopenButton(options.sidebarId);
     let sidebar = document.getElementById(options.sidebarId);
     if (!sidebar) {
       sidebar = document.createElement("aside");
@@ -19,6 +27,7 @@
       <div class="${RESIZE_HANDLE_CLASS}" aria-hidden="true"></div>
       <header>
         <h2>${options.title}</h2>
+        <button class="${CLOSE_BUTTON_CLASS}" type="button" aria-label="Close panel">\xD7</button>
       </header>
       <section class="${PANEL_BODY_CLASS}"></section>
     `;
@@ -29,6 +38,7 @@
     const maxWidth = options.maxWidth ?? 700;
     sidebar.style.width = `${clamp(width, minWidth, maxWidth)}px`;
     initResizeBehavior(sidebar, options);
+    initCloseBehavior(sidebar, options);
     const body = sidebar.querySelector(`.${PANEL_BODY_CLASS}`);
     if (!body) {
       throw new Error("failed to initialize extension panel body");
@@ -38,6 +48,10 @@
   function removeExtensionPanel(sidebarId) {
     const sidebar = document.getElementById(sidebarId);
     sidebar?.remove();
+  }
+  function removeExtensionPanelLauncher(sidebarId) {
+    const reopenButton = document.getElementById(getReopenButtonId(sidebarId));
+    reopenButton?.remove();
   }
   function ensureExtensionPanelStyle(options) {
     if (document.getElementById(options.styleId)) return;
@@ -62,6 +76,10 @@
       border-bottom: 1px solid #e2e8f0;
       background: #f1f5f9;
       padding: 12px 14px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
     }
 
     #${options.sidebarId} > header > h2 {
@@ -69,6 +87,44 @@
       font-size: 13px;
       font-weight: 700;
       color: #0f172a;
+    }
+
+    #${options.sidebarId} .${CLOSE_BUTTON_CLASS} {
+      border: 1px solid #cbd5e1;
+      border-radius: 9999px;
+      width: 24px;
+      height: 24px;
+      padding: 0;
+      line-height: 1;
+      font-size: 16px;
+      color: #334155;
+      background: #ffffff;
+      cursor: pointer;
+    }
+
+    #${options.sidebarId} .${CLOSE_BUTTON_CLASS}:hover {
+      background: #e2e8f0;
+    }
+
+    .${REOPEN_BUTTON_CLASS} {
+      position: fixed;
+      right: 10px;
+      top: 10%;
+      transform: translateY(-50%);
+      z-index: 999997;
+      border: 1px solid #cbd5e1;
+      border-radius: 10px;
+      padding: 8px 10px;
+      font-size: 12px;
+      font-weight: 700;
+      color: #0f172a;
+      background: #ffffff;
+      box-shadow: 0 4px 12px rgba(15, 23, 42, 0.2);
+      cursor: pointer;
+    }
+
+    .${REOPEN_BUTTON_CLASS}:hover {
+      background: #f1f5f9;
     }
 
     #${options.sidebarId} .${PANEL_BODY_CLASS} {
@@ -136,6 +192,42 @@
     });
     sidebar.dataset.resizeReady = "1";
   }
+  function initCloseBehavior(sidebar, options) {
+    if (sidebar.dataset.closeReady === "1") return;
+    const closeButton = sidebar.querySelector(`.${CLOSE_BUTTON_CLASS}`);
+    if (!closeButton) return;
+    closeButton.addEventListener("click", () => {
+      removeExtensionPanel(options.sidebarId);
+      ensureReopenButton(options);
+      options.onClose?.();
+    });
+    sidebar.dataset.closeReady = "1";
+  }
+  function ensureReopenButton(options) {
+    if (!options.onReopen) return;
+    const buttonId = getReopenButtonId(options.sidebarId);
+    let button = document.getElementById(buttonId);
+    if (!button) {
+      button = document.createElement("button");
+      button.id = buttonId;
+      button.type = "button";
+      button.className = REOPEN_BUTTON_CLASS;
+      button.textContent = `${options.title} \u3092\u518D\u8868\u793A`;
+      document.body.appendChild(button);
+    }
+    button.style.display = "block";
+    button.onclick = () => {
+      options.onReopen?.();
+    };
+  }
+  function hideReopenButton(sidebarId) {
+    const button = document.getElementById(getReopenButtonId(sidebarId));
+    if (!button) return;
+    button.style.display = "none";
+  }
+  function getReopenButtonId(sidebarId) {
+    return `${sidebarId}-reopen`;
+  }
   function clamp(value, min, max) {
     return Math.min(max, Math.max(min, value));
   }
@@ -156,18 +248,20 @@
     } catch {
     }
   }
-  var PANEL_BODY_CLASS, RESIZE_HANDLE_CLASS;
+  var PANEL_BODY_CLASS, RESIZE_HANDLE_CLASS, CLOSE_BUTTON_CLASS, REOPEN_BUTTON_CLASS;
   var init_extension_panel_view = __esm({
     "content/shared/extension-panel-view.ts"() {
       "use strict";
       PANEL_BODY_CLASS = "p-manager-extension-panel-body";
       RESIZE_HANDLE_CLASS = "p-manager-extension-panel-resize";
+      CLOSE_BUTTON_CLASS = "p-manager-extension-panel-close";
+      REOPEN_BUTTON_CLASS = "p-manager-extension-panel-reopen";
     }
   });
 
   // content/shared/send-button-view.ts
   function buildSendButtonHtml(buttonId) {
-    return `<button id="${buttonId}" type="button">\u9001\u308B</button>`;
+    return `<button id="${buttonId}" type="button">\u81EA\u52D5\u751F\u6210</button>`;
   }
   function buildSendButtonCss(buttonId, baseColor, hoverColor) {
     return `
@@ -289,6 +383,7 @@
   var init_message_thread = __esm({
     "content/message-module/message-thread.ts"() {
       "use strict";
+      init_types();
       init_extension_panel_view();
       init_send_button_view();
       defaultSelectors = {
@@ -312,7 +407,12 @@
           this.seenIds = /* @__PURE__ */ new Set();
           this.matchInfo = null;
           this.matchName = null;
+          this.nativeHostBody = [];
+          this.recommendedStrategy = null;
+          this.isMessageLoading = false;
+          this.isProfileLoading = false;
           this.activePane = null;
+          this.lastClosedPane = null;
           this.sendButton = null;
           this.sendMessageButtonId = "p-manager-message-send-button";
           this.sendMessageButtonStyleId = "p-manager-message-send-style";
@@ -344,13 +444,9 @@
         }
         init() {
           this.initPageObserver();
-          this.initListener();
         }
         getThreadContainer() {
           return document.querySelector(this.selectors.container);
-        }
-        // backgroundからのメッセージを受信
-        initListener() {
         }
         // PageObserverの作成
         initPageObserver() {
@@ -377,7 +473,30 @@
           this.destroyPageObserver();
           this.destroyThreadItems();
           this.matchInfo = null;
+          this.nativeHostBody = [];
+          this.recommendedStrategy = null;
+          this.isMessageLoading = false;
+          this.isProfileLoading = false;
           this.destroyPane();
+        }
+        setNativeHostBody(body, source, recommendedStrategy) {
+          if (source === "MATCH_MESSAGES" /* MATCH_MESSAGES */) {
+            this.nativeHostBody.push(body);
+            this.isMessageLoading = false;
+          }
+          if (source === "MATCH_PROFILE" /* MATCH_PROFILE */) {
+            this.isProfileLoading = false;
+            const direct = recommendedStrategy ?? (body && typeof body === "object" && "recommended_strategy" in body ? body.recommended_strategy : null);
+            if (direct != null) {
+              this.recommendedStrategy = direct;
+            }
+          }
+          if (this.activePane === "message") {
+            this.initMessagePane();
+          }
+          if (this.activePane === "profile") {
+            this.initProfilePane();
+          }
         }
         initMessagePane() {
           this.ensurePaneStyle();
@@ -389,15 +508,31 @@
             storageKey: this.messagePanelWidthStorageKey,
             defaultWidth: 320,
             minWidth: 260,
-            maxWidth: 700
+            maxWidth: 700,
+            onClose: () => {
+              this.lastClosedPane = this.activePane;
+              this.sendButton = null;
+              this.activePane = null;
+            },
+            onReopen: () => {
+              if (this.lastClosedPane === "profile") {
+                this.initProfilePane();
+                return;
+              }
+              this.initMessagePane();
+            }
           });
-          const content = this.threadItems.length === 0 ? "threadItems: []" : JSON.stringify(this.threadItems, null, 2);
-          panelBody.innerHTML = `<div>Message Page</div><pre></pre>${buildSendButtonHtml(this.sendMessageButtonId)}`;
-          const pre = panelBody.querySelector("pre");
-          if (pre) pre.textContent = content;
+          panelBody.innerHTML = `
+      <div>Message Page</div>
+      <div class="p-manager-response-list"></div>
+      ${buildSendButtonHtml(this.sendMessageButtonId)}
+    `;
+          this.renderMessageResponseCards(panelBody);
           const button = panelBody.querySelector(`#${this.sendMessageButtonId}`);
           if (!button) return;
           button.addEventListener("click", () => this.onMessageSendButtonClick());
+          button.disabled = this.isMessageLoading;
+          button.textContent = this.isMessageLoading ? "\u751F\u6210\u4E2D..." : "\u751F\u6210";
           this.sendButton = button;
         }
         initProfilePane() {
@@ -410,15 +545,41 @@
             storageKey: this.messagePanelWidthStorageKey,
             defaultWidth: 320,
             minWidth: 260,
-            maxWidth: 700
+            maxWidth: 700,
+            onClose: () => {
+              this.lastClosedPane = this.activePane;
+              this.sendButton = null;
+              this.activePane = null;
+            },
+            onReopen: () => {
+              if (this.lastClosedPane === "profile") {
+                this.initProfilePane();
+                return;
+              }
+              this.initMessagePane();
+            }
           });
-          const content = this.matchInfo == null ? "matchInfo: null" : JSON.stringify(this.matchInfo, null, 2);
-          panelBody.innerHTML = `<div>Profile Page</div><pre></pre>${buildSendButtonHtml(this.sendMessageButtonId)}`;
-          const pre = panelBody.querySelector("pre");
-          if (pre) pre.textContent = content;
+          panelBody.innerHTML = `
+      <div>Profile Page</div>
+      <div class="p-manager-response-list">
+        <article class="p-manager-response-card p-manager-profile-card">
+          <p class="p-manager-response-card-title">Profile</p>
+          <div class="p-manager-profile-rows"></div>
+        </article>
+        <article class="p-manager-response-card">
+          <p class="p-manager-response-card-title">Recommended Strategy</p>
+          <p class="p-manager-response-card-body p-manager-strategy-body"></p>
+        </article>
+      </div>
+      ${buildSendButtonHtml(this.sendMessageButtonId)}
+    `;
+          this.renderProfileSummary(panelBody);
+          this.renderRecommendedStrategy(panelBody);
           const button = panelBody.querySelector(`#${this.sendMessageButtonId}`);
           if (!button) return;
           button.addEventListener("click", () => this.onProfileSendButtonClick());
+          button.disabled = this.isProfileLoading;
+          button.textContent = this.isProfileLoading ? "\u751F\u6210\u4E2D..." : "\u751F\u6210";
           this.sendButton = button;
         }
         ensurePaneStyle() {
@@ -438,32 +599,227 @@
         white-space: pre-wrap;
         overflow-wrap: anywhere;
       }
+      #${this.messagePanelId} .p-manager-response-list {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
+      #${this.messagePanelId} .p-manager-response-card {
+        border: 1px solid #cbd5e1;
+        border-radius: 10px;
+        background: #ffffff;
+        padding: 10px;
+        box-shadow: 0 1px 2px rgba(15,23,42,0.08);
+      }
+      #${this.messagePanelId} .p-manager-response-card-title {
+        margin: 0 0 6px;
+        font-size: 12px;
+        font-weight: 700;
+        color: #334155;
+      }
+      #${this.messagePanelId} .p-manager-response-card-body {
+        margin: 0;
+        color: #0f172a;
+        font-size: 13px;
+        line-height: 1.6;
+        white-space: pre-wrap;
+        overflow-wrap: anywhere;
+      }
+      #${this.messagePanelId} .p-manager-profile-rows {
+        display: grid;
+        gap: 6px;
+      }
+      #${this.messagePanelId} .p-manager-profile-row {
+        display: grid;
+        grid-template-columns: 170px 1fr;
+        gap: 8px;
+        align-items: start;
+        font-size: 12px;
+        line-height: 1.4;
+      }
+      #${this.messagePanelId} .p-manager-profile-row-label {
+        color: #475569;
+        font-weight: 700;
+      }
+      #${this.messagePanelId} .p-manager-profile-row-value {
+        color: #0f172a;
+        white-space: pre-wrap;
+        overflow-wrap: anywhere;
+      }
+      #${this.messagePanelId} .p-manager-response-card pre {
+        margin: 0;
+        padding: 8px;
+        border: 1px solid #e2e8f0;
+        border-radius: 8px;
+        background: #f8fafc;
+        color: #0f172a;
+        font-size: 12px;
+        line-height: 1.4;
+        white-space: pre-wrap;
+        overflow-wrap: anywhere;
+      }
       ${buildSendButtonCss(this.sendMessageButtonId, "#0d9488", "#0f766e")}
     `;
           document.head.appendChild(style);
+        }
+        renderMessageResponseCards(panelBody) {
+          const list = panelBody.querySelector(".p-manager-response-list");
+          if (!list) return;
+          const cards = [];
+          this.nativeHostBody.forEach((response, index) => {
+            const messages = this.extractRecommendedMessages(response);
+            messages.forEach((text, messageIndex) => {
+              cards.push({
+                title: messages.length === 1 ? `Recommended Message ${index + 1}` : `Recommended Message ${index + 1}-${messageIndex + 1}`,
+                text
+              });
+            });
+          });
+          if (cards.length === 0) {
+            const card = document.createElement("article");
+            card.className = "p-manager-response-card";
+            card.innerHTML = `
+        <p class="p-manager-response-card-title">Recommended Message</p>
+        <p class="p-manager-response-card-body">${this.isMessageLoading ? "recommended_message \u3092\u751F\u6210\u4E2D\u3067\u3059..." : "\u30E1\u30C3\u30BB\u30FC\u30B8\u3092\u4F5C\u3063\u3066\u3082\u3089\u3044\u307E\u3057\u3087\u3046"}</p>
+      `;
+            list.appendChild(card);
+            return;
+          }
+          cards.forEach((cardData) => {
+            const card = document.createElement("article");
+            card.className = "p-manager-response-card";
+            const title = document.createElement("p");
+            title.className = "p-manager-response-card-title";
+            title.textContent = cardData.title;
+            const body = document.createElement("p");
+            body.className = "p-manager-response-card-body";
+            body.textContent = cardData.text;
+            card.appendChild(title);
+            card.appendChild(body);
+            list.appendChild(card);
+          });
+        }
+        renderProfileSummary(panelBody) {
+          const root = panelBody.querySelector(".p-manager-profile-rows");
+          if (!root) return;
+          if (this.matchInfo == null) {
+            const empty = document.createElement("p");
+            empty.className = "p-manager-response-card-body";
+            empty.textContent = "\u30D7\u30ED\u30D5\u30A3\u30FC\u30EB\u304C\u307E\u3060\u53D6\u5F97\u3067\u304D\u3066\u3044\u307E\u305B\u3093\u3002";
+            root.appendChild(empty);
+            return;
+          }
+          const rows = Object.entries(this.matchInfo).filter(([, value]) => value != null && String(value).trim().length > 0);
+          if (rows.length === 0) {
+            const empty = document.createElement("p");
+            empty.className = "p-manager-response-card-body";
+            empty.textContent = "\u8868\u793A\u3067\u304D\u308B\u30D7\u30ED\u30D5\u30A3\u30FC\u30EB\u9805\u76EE\u304C\u3042\u308A\u307E\u305B\u3093\u3002";
+            root.appendChild(empty);
+            return;
+          }
+          rows.forEach(([key, value]) => {
+            const row = document.createElement("div");
+            row.className = "p-manager-profile-row";
+            const label = document.createElement("div");
+            label.className = "p-manager-profile-row-label";
+            label.textContent = key;
+            const body = document.createElement("div");
+            body.className = "p-manager-profile-row-value";
+            body.textContent = String(value);
+            row.appendChild(label);
+            row.appendChild(body);
+            root.appendChild(row);
+          });
+        }
+        renderRecommendedStrategy(panelBody) {
+          const body = panelBody.querySelector(".p-manager-strategy-body");
+          if (!body) return;
+          if (this.recommendedStrategy == null) {
+            body.textContent = this.isProfileLoading ? "recommended_strategy \u3092\u751F\u6210\u4E2D\u3067\u3059..." : "\u76F8\u624B\u306B\u3042\u3063\u305F\u6226\u7565\u3092\u8003\u3048\u307E\u3059";
+            return;
+          }
+          if (typeof this.recommendedStrategy === "string") {
+            body.textContent = this.recommendedStrategy;
+            return;
+          }
+          body.textContent = JSON.stringify(this.recommendedStrategy, null, 2);
+        }
+        extractRecommendedMessages(response) {
+          const source = response && typeof response === "object" && "recommended_message" in response ? response.recommended_message : null;
+          if (source == null) return [];
+          const flatten = (value) => {
+            if (value == null) return [];
+            if (typeof value === "string") {
+              const trimmed = value.trim();
+              return trimmed.length === 0 ? [] : [trimmed];
+            }
+            if (Array.isArray(value)) {
+              return value.flatMap((entry) => flatten(entry));
+            }
+            if (typeof value === "object") {
+              if ("body" in value) {
+                return flatten(value.body);
+              }
+              return [JSON.stringify(value, null, 2)];
+            }
+            return [String(value)];
+          };
+          return flatten(source);
         }
         destroyPane() {
           this.sendButton?.remove();
           this.sendButton = null;
           this.activePane = null;
+          this.lastClosedPane = null;
           removeExtensionPanel(this.messagePanelId);
+          removeExtensionPanelLauncher(this.messagePanelId);
         }
         onMessageSendButtonClick() {
+          if (this.isMessageLoading) return;
+          this.isMessageLoading = true;
+          if (this.activePane === "message") {
+            this.initMessagePane();
+          }
           chrome.runtime.sendMessage({
             kind: "MESSAGE_SEND_BUTTON_CLICKED",
             url: this.id,
             title: this.title,
             data: this.threadItems
+          }).then((res) => {
+            if (res?.ok) return;
+            this.isMessageLoading = false;
+            if (this.activePane === "message") {
+              this.initMessagePane();
+            }
           }).catch(() => {
+            this.isMessageLoading = false;
+            if (this.activePane === "message") {
+              this.initMessagePane();
+            }
           });
         }
         onProfileSendButtonClick() {
+          if (this.isProfileLoading) return;
+          this.isProfileLoading = true;
+          if (this.activePane === "profile") {
+            this.initProfilePane();
+          }
           chrome.runtime.sendMessage({
             kind: "MESSAGE_PROFILE_SEND_BUTTON_CLICKED",
             url: this.id,
             title: this.title,
             data: this.matchInfo
+          }).then((res) => {
+            if (res?.ok) return;
+            this.isProfileLoading = false;
+            if (this.activePane === "profile") {
+              this.initProfilePane();
+            }
           }).catch(() => {
+            this.isProfileLoading = false;
+            if (this.activePane === "profile") {
+              this.initProfilePane();
+            }
           });
         }
         initThreadItems(container) {
@@ -616,12 +972,23 @@
         listen() {
           chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
             if (!request || typeof request !== "object") return;
+            if (request.kind === "MESSAGE_NATIVE_BODY_RECEIVED") {
+              const targetUrl = String(request.url ?? "");
+              const targetThread = (targetUrl ? this.threads.get(targetUrl) : void 0) ?? this.activeThread;
+              targetThread?.setNativeHostBody(
+                request.body ?? null,
+                request.source,
+                request.recommendedStrategy ?? null
+              );
+              return;
+            }
             if (request.kind === "MESSAGE_STOP_OBSERVE") {
               this.activeThread?.reset();
               this.activeThread = null;
               return;
             }
             if (request.kind === "MESSAGE_OPEN_PROFILE") {
+              this.activeThread?.reset();
               this.activeThread?.initMatchProfile(0);
               this.activeThread?.initProfilePane();
               return;
@@ -658,6 +1025,7 @@
   var init_profile_thread = __esm({
     "content/profile-module/profile-thread.ts"() {
       "use strict";
+      init_types();
       init_message_thread();
       init_extension_panel_view();
       init_send_button_view();
@@ -674,6 +1042,8 @@
           this.selectors = selectors;
           this.myProfile = null;
           this.myName = null;
+          this.recommendedProfile = null;
+          this.isProfileLoading = false;
           this.isProfilePaneVisible = false;
           this.sendButton = null;
           this.sendProfileButtonId = "p-manager-profile-send-button";
@@ -685,16 +1055,27 @@
         }
         init() {
           this.initProfile();
-          this.initListener();
         }
         reset() {
           this.myProfile = null;
+          this.recommendedProfile = null;
+          this.isProfileLoading = false;
           this.destroyProfilePane();
+        }
+        setNativeHostBody(body, source, recommendedProfile) {
+          if (source === "MY_PROFILE" /* MY_PROFILE */) {
+            this.isProfileLoading = false;
+            const direct = recommendedProfile ?? (body && typeof body === "object" && "recommended_profile" in body ? body.recommended_profile : null);
+            if (direct != null) {
+              this.recommendedProfile = direct;
+            }
+          }
+          if (this.isProfilePaneVisible) {
+            this.initProfilePane();
+          }
         }
         getThreadContainer() {
           return document.querySelector(this.selectors.container);
-        }
-        initListener() {
         }
         initMessagePane() {
           this.initProfilePane();
@@ -709,15 +1090,36 @@
             storageKey: this.profilePanelWidthStorageKey,
             defaultWidth: 320,
             minWidth: 260,
-            maxWidth: 700
+            maxWidth: 700,
+            onClose: () => {
+              this.sendButton = null;
+              this.isProfilePaneVisible = false;
+            },
+            onReopen: () => {
+              this.initProfilePane();
+            }
           });
-          const profileText = this.myProfile == null ? "profileInfo: null" : JSON.stringify(this.myProfile, null, 2);
-          panelBody.innerHTML = `<div>Profile Page</div><pre></pre>${buildSendButtonHtml(this.sendProfileButtonId)}`;
-          const pre = panelBody.querySelector("pre");
-          if (pre) pre.textContent = profileText;
+          panelBody.innerHTML = `
+      <div>Profile Page</div>
+      <div class="p-manager-profile-list">
+        <article class="p-manager-profile-card">
+          <p class="p-manager-profile-card-title">My Profile</p>
+          <div class="p-manager-profile-rows"></div>
+        </article>
+        <article class="p-manager-profile-card">
+          <p class="p-manager-profile-card-title">Recommended Profile</p>
+          <div class="p-manager-recommended-profile-body"></div>
+        </article>
+      </div>
+      ${buildSendButtonHtml(this.sendProfileButtonId)}
+    `;
+          this.renderMyProfile(panelBody);
+          this.renderRecommendedProfile(panelBody);
           const button = panelBody.querySelector(`#${this.sendProfileButtonId}`);
           if (!button) return;
           button.addEventListener("click", () => this.onSendButtonClick());
+          button.disabled = this.isProfileLoading;
+          button.textContent = this.isProfileLoading ? "\u751F\u6210\u4E2D..." : "\u751F\u6210";
           this.sendButton = button;
         }
         ensureProfilePaneStyle() {
@@ -725,12 +1127,51 @@
           const style = document.createElement("style");
           style.id = this.sendProfileButtonStyleId;
           style.textContent = `
-      #${this.profilePanelId} pre {
-        margin: 0;
+      #${this.profilePanelId} .p-manager-profile-list {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
+      #${this.profilePanelId} .p-manager-profile-card {
+        border: 1px solid #cbd5e1;
+        border-radius: 10px;
+        background: #ffffff;
         padding: 10px;
+        box-shadow: 0 1px 2px rgba(15,23,42,0.08);
+      }
+      #${this.profilePanelId} .p-manager-profile-card-title {
+        margin: 0 0 8px;
+        font-size: 12px;
+        font-weight: 700;
+        color: #334155;
+      }
+      #${this.profilePanelId} .p-manager-profile-rows {
+        display: grid;
+        gap: 6px;
+      }
+      #${this.profilePanelId} .p-manager-profile-row {
+        display: grid;
+        grid-template-columns: 170px 1fr;
+        gap: 8px;
+        align-items: start;
+        font-size: 12px;
+        line-height: 1.4;
+      }
+      #${this.profilePanelId} .p-manager-profile-row-label {
+        color: #475569;
+        font-weight: 700;
+      }
+      #${this.profilePanelId} .p-manager-profile-row-value {
+        color: #0f172a;
+        white-space: pre-wrap;
+        overflow-wrap: anywhere;
+      }
+      #${this.profilePanelId} .p-manager-recommended-profile-body {
+        margin: 0;
+        padding: 8px;
         border: 1px solid #cbd5e1;
         border-radius: 8px;
-        background: #ffffff;
+        background: #f8fafc;
         color: #0f172a;
         font-size: 12px;
         line-height: 1.4;
@@ -741,19 +1182,78 @@
     `;
           document.head.appendChild(style);
         }
+        renderMyProfile(panelBody) {
+          const root = panelBody.querySelector(".p-manager-profile-rows");
+          if (!root) return;
+          if (this.myProfile == null) {
+            const empty = document.createElement("p");
+            empty.textContent = "\u81EA\u5DF1\u7D39\u4ECB\u6587\u3092\u63D0\u6848\u3057\u307E\u3059";
+            root.appendChild(empty);
+            return;
+          }
+          const rows = Object.entries(this.myProfile).filter(([, value]) => value != null && String(value).trim().length > 0);
+          if (rows.length === 0) {
+            const empty = document.createElement("p");
+            empty.textContent = "\u8868\u793A\u3067\u304D\u308B\u30D7\u30ED\u30D5\u30A3\u30FC\u30EB\u9805\u76EE\u304C\u3042\u308A\u307E\u305B\u3093\u3002";
+            root.appendChild(empty);
+            return;
+          }
+          rows.forEach(([key, value]) => {
+            const row = document.createElement("div");
+            row.className = "p-manager-profile-row";
+            const label = document.createElement("div");
+            label.className = "p-manager-profile-row-label";
+            label.textContent = key;
+            const body = document.createElement("div");
+            body.className = "p-manager-profile-row-value";
+            body.textContent = String(value);
+            row.appendChild(label);
+            row.appendChild(body);
+            root.appendChild(row);
+          });
+        }
+        renderRecommendedProfile(panelBody) {
+          const body = panelBody.querySelector(".p-manager-recommended-profile-body");
+          if (!body) return;
+          if (this.recommendedProfile == null) {
+            body.textContent = this.isProfileLoading ? "recommended_profile \u3092\u751F\u6210\u4E2D\u3067\u3059..." : "\u30D7\u30ED\u30D5\u30A3\u30FC\u30EB\u3092\u63D0\u6848\u3057\u307E\u3059";
+            return;
+          }
+          if (typeof this.recommendedProfile === "string") {
+            body.textContent = this.recommendedProfile;
+            return;
+          }
+          body.textContent = JSON.stringify(this.recommendedProfile, null, 2);
+        }
         destroyProfilePane() {
           this.sendButton?.remove();
           this.sendButton = null;
           this.isProfilePaneVisible = false;
           removeExtensionPanel(this.profilePanelId);
+          removeExtensionPanelLauncher(this.profilePanelId);
         }
         onSendButtonClick() {
+          if (this.isProfileLoading) return;
+          this.isProfileLoading = true;
+          if (this.isProfilePaneVisible) {
+            this.initProfilePane();
+          }
           chrome.runtime.sendMessage({
             kind: "PROFILE_SEND_BUTTON_CLICKED",
             url: this.id,
             title: this.title,
             data: this.myProfile
+          }).then((res) => {
+            if (res?.ok) return;
+            this.isProfileLoading = false;
+            if (this.isProfilePaneVisible) {
+              this.initProfilePane();
+            }
           }).catch(() => {
+            this.isProfileLoading = false;
+            if (this.isProfilePaneVisible) {
+              this.initProfilePane();
+            }
           });
         }
         initProfile() {
@@ -873,6 +1373,16 @@
         listen() {
           chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
             if (!request || typeof request !== "object") return;
+            if (request.kind === "PROFILE_NATIVE_BODY_RECEIVED") {
+              const targetUrl = String(request.url ?? "");
+              const targetThread = (targetUrl ? this.threads.get(targetUrl) : void 0) ?? this.activeThread;
+              targetThread?.setNativeHostBody(
+                request.body ?? null,
+                request.source,
+                request.recommendedProfile ?? null
+              );
+              return;
+            }
             if (request.kind !== "PROFILE_START_OBSERVE") {
               this.activeThread?.reset();
               this.activeThread = null;

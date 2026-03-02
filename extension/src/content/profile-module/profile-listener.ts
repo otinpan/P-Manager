@@ -13,6 +13,18 @@ export class ProfileListener{
   listen(){
     chrome.runtime.onMessage.addListener((request,sender,sendResponse)=>{
       if(!request||typeof request !=="object")return;
+      if((request as any).kind==="PROFILE_NATIVE_BODY_RECEIVED"){
+        const targetUrl = String((request as any).url ?? "");
+        const targetThread =
+          (targetUrl ? this.threads.get(targetUrl) : undefined) ??
+          this.activeThread;
+        targetThread?.setNativeHostBody(
+          (request as any).body ?? null,
+          (request as any).source,
+          (request as any).recommendedProfile ?? null,
+        );
+        return;
+      }
       if((request as any).kind!=="PROFILE_START_OBSERVE"){
         this.activeThread?.reset();
         this.activeThread=null;
