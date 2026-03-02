@@ -1,7 +1,7 @@
 {
   "name": "p_manager_host_chrome",
   "description": "p-manager-host",
-  "path": "%LOCALAPPDATA%\\PManager\\bin\\native-host.exe",
+  "path": "C:\\Users\\hases\\AppData\\Local\\PManager\\bin\\native-host.exe",
   "type": "stdio",
   "allowed_origins":["chrome-extension://jmboadaghfmijjicpmlobcggmeioncfo/"]
 }

@@ -1,0 +1,7 @@
+/home/hase/P-Manager/native-host/target/debug/deps/parking-8c964f492b0ce448.d: /home/hase/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/parking-2.2.1/src/lib.rs
+
+/home/hase/P-Manager/native-host/target/debug/deps/libparking-8c964f492b0ce448.rlib: /home/hase/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/parking-2.2.1/src/lib.rs
+
+/home/hase/P-Manager/native-host/target/debug/deps/libparking-8c964f492b0ce448.rmeta: /home/hase/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/parking-2.2.1/src/lib.rs
+
+/home/hase/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/parking-2.2.1/src/lib.rs:
