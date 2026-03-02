@@ -85,6 +85,7 @@ export type MyProfileRow = Profile & {
 export interface MatchMessages{
   type: RESPONSE_TYPE.MATCH_MESSAGES;
   partner: PartnerRow;
+  user_prompt: string;
   messages: MessageRow[];
 }
 

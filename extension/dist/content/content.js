@@ -411,11 +411,13 @@
           this.recommendedStrategy = null;
           this.isMessageLoading = false;
           this.isProfileLoading = false;
+          this.messageUserPrompt = "";
           this.activePane = null;
           this.lastClosedPane = null;
           this.sendButton = null;
           this.sendMessageButtonId = "p-manager-message-send-button";
           this.sendMessageButtonStyleId = "p-manager-message-send-style";
+          this.messagePromptTextareaId = "p-manager-message-user-prompt";
           this.messagePanelId = "p-manager-message-panel";
           this.messagePanelStyleId = "p-manager-message-panel-style";
           this.messagePanelWidthStorageKey = "p-manager-message-panel-width";
@@ -473,8 +475,6 @@
           this.destroyPageObserver();
           this.destroyThreadItems();
           this.matchInfo = null;
-          this.nativeHostBody = [];
-          this.recommendedStrategy = null;
           this.isMessageLoading = false;
           this.isProfileLoading = false;
           this.destroyPane();
@@ -525,9 +525,17 @@
           panelBody.innerHTML = `
       <div>Message Page</div>
       <div class="p-manager-response-list"></div>
+      <textarea id="${this.messagePromptTextareaId}" class="p-manager-user-prompt" placeholder="\u8FFD\u52A0\u306E\u8981\u671B\u3092\u5165\u529B..."></textarea>
       ${buildSendButtonHtml(this.sendMessageButtonId)}
     `;
           this.renderMessageResponseCards(panelBody);
+          const promptTextarea = panelBody.querySelector(`#${this.messagePromptTextareaId}`);
+          if (promptTextarea) {
+            promptTextarea.value = this.messageUserPrompt;
+            promptTextarea.addEventListener("input", () => {
+              this.messageUserPrompt = promptTextarea.value;
+            });
+          }
           const button = panelBody.querySelector(`#${this.sendMessageButtonId}`);
           if (!button) return;
           button.addEventListener("click", () => this.onMessageSendButtonClick());
@@ -658,6 +666,18 @@
         white-space: pre-wrap;
         overflow-wrap: anywhere;
       }
+      #${this.messagePanelId} .p-manager-user-prompt {
+        width: 100%;
+        min-height: 88px;
+        border: 1px solid #cbd5e1;
+        border-radius: 8px;
+        padding: 8px 10px;
+        font-size: 12px;
+        line-height: 1.5;
+        color: #0f172a;
+        background: #ffffff;
+        resize: vertical;
+      }
       ${buildSendButtonCss(this.sendMessageButtonId, "#0d9488", "#0f766e")}
     `;
           document.head.appendChild(style);
@@ -784,7 +804,8 @@
             kind: "MESSAGE_SEND_BUTTON_CLICKED",
             url: this.id,
             title: this.title,
-            data: this.threadItems
+            data: this.threadItems,
+            userPrompt: this.messageUserPrompt
           }).then((res) => {
             if (res?.ok) return;
             this.isMessageLoading = false;

@@ -46,6 +46,7 @@ export class MessageHandler extends Handler{
     const result=request as any;
     const partnerId = String(result.url ?? "");
     const items = Array.isArray(result.data) ? (result.data as ThreadMessage[]) : [];
+    const userPrompt = String(result.userPrompt ?? "次のメッセージを作成してください");
     const updatedAt = new Date().toISOString();
 
     const payload: MatchMessages = {
@@ -54,6 +55,7 @@ export class MessageHandler extends Handler{
         id: partnerId,
         updated_at: updatedAt,
       },
+      user_prompt: userPrompt,
       messages: items.map((item)=>({
         id: item.id,
         partner_id: partnerId,

@@ -50,9 +50,10 @@ async fn async_main() -> Result<()> {
         let output = match req {
             types::RequestFromChrome::MatchMessages { 
                 partner,
+                user_prompt,
                 messages,
             } => {
-            let out = handle_match_messages(&db_pool, &partner, &messages, api_key.as_deref()).await?;
+            let out = handle_match_messages(&db_pool, &partner, &messages,user_prompt.as_str(), api_key.as_deref()).await?;
             log_line(&format!(
                 "received MATCH_MESSAGES: partner_id={}, messages={}",
                 partner.id,
@@ -118,6 +119,7 @@ async fn handle_match_messages(
     pool: &SqlitePool,
     partner: &PartnerRow,
     messages: &[MessageRow],
+    user_prompt: &str,
     api_key: Option<&str>,
 ) -> Result<OutputMessage> {
     // 保存
@@ -129,7 +131,7 @@ async fn handle_match_messages(
     let Some(my_id) = resolve_my_id(pool).await? else {
         return Ok(OutputMessage { message: None });
     };
-    gpt_response::get_recommended_message(api_key, pool, &partner.id, &my_id).await
+    gpt_response::get_recommended_message(api_key, pool, &partner.id, &my_id,user_prompt).await
 }
 
 async fn handle_my_profile(

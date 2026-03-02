@@ -39,16 +39,18 @@ pub async fn get_recommended_message(
     pool: &SqlitePool,
     match_id: &str,
     my_id: &str,
+    user_prompt: &str,
 ) -> Result<OutputMessage> {
     let match_profile = get_match_profile_json(pool, match_id).await?;
     let my_profile = get_my_profile_json(pool, my_id).await?;
     let match_messages = get_match_messages_json(pool, match_id).await?;
 
-    let user_message = "あなたはマッチングアプリの代行業者です。プロフィール情報と過去の会話内容から、次に送るメッセージを作成してください。";
+    let user_message = "あなたはマッチングアプリの代行業者です。プロフィール情報と過去の会話内容、ユーザーの要望から、次に送るメッセージを作成してください。";
     let prompt = build_match_messages_prompt(
         my_profile.as_ref(),
         match_profile.as_ref(),
         match_messages.as_ref(),
+        user_prompt,
         user_message,
     );
     send_message_to_llm(api_key, prompt).await
@@ -186,6 +188,7 @@ pub fn build_match_messages_prompt(
     my_profile: Option<&Value>,
     match_profile: Option<&Value>,
     match_messages: Option<&Value>,
+    user_prompt: &str,
     user_message: &str,
 ) -> Value {
     let schema = normalize_openai_json_schema(json!(schema_for!(OutputMessage)));
@@ -199,6 +202,11 @@ pub fn build_match_messages_prompt(
     let match_messages_context = match_messages
         .map(to_pretty_json_context)
         .unwrap_or_else(|| "過去メッセージ: なし".to_string());
+    let user_prompt_context = if user_prompt.trim().is_empty() {
+        "ユーザーの要望: なし".to_string()
+    } else {
+        format!("ユーザーの要望: {user_prompt}")
+    };
 
     json!({
         "model": "gpt-4.1-mini",
@@ -218,6 +226,10 @@ pub fn build_match_messages_prompt(
             {
                 "role": "system",
                 "content": match_messages_context
+            },
+            {
+                "role": "system",
+                "content": user_prompt_context
             },
             {
                 "role": "user",

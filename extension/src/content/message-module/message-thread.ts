@@ -174,11 +174,13 @@ export class MessageThread{
   private recommendedStrategy: unknown = null;
   private isMessageLoading = false;
   private isProfileLoading = false;
+  private messageUserPrompt = "";
   private activePane: "message" | "profile" | null = null;
   private lastClosedPane: "message" | "profile" | null = null;
   private sendButton: HTMLButtonElement | null = null;
   private readonly sendMessageButtonId = "p-manager-message-send-button";
   private readonly sendMessageButtonStyleId = "p-manager-message-send-style";
+  private readonly messagePromptTextareaId = "p-manager-message-user-prompt";
   private readonly messagePanelId = "p-manager-message-panel";
   private readonly messagePanelStyleId = "p-manager-message-panel-style";
   private readonly messagePanelWidthStorageKey = "p-manager-message-panel-width";
@@ -232,8 +234,6 @@ export class MessageThread{
     this.destroyPageObserver();
     this.destroyThreadItems();
     this.matchInfo=null;
-    this.nativeHostBody = [];
-    this.recommendedStrategy = null;
     this.isMessageLoading = false;
     this.isProfileLoading = false;
     this.destroyPane();
@@ -296,9 +296,17 @@ export class MessageThread{
     panelBody.innerHTML = `
       <div>Message Page</div>
       <div class="p-manager-response-list"></div>
+      <textarea id="${this.messagePromptTextareaId}" class="p-manager-user-prompt" placeholder="追加の要望を入力..."></textarea>
       ${buildSendButtonHtml(this.sendMessageButtonId)}
     `;
     this.renderMessageResponseCards(panelBody);
+    const promptTextarea = panelBody.querySelector(`#${this.messagePromptTextareaId}`) as HTMLTextAreaElement | null;
+    if(promptTextarea){
+      promptTextarea.value = this.messageUserPrompt;
+      promptTextarea.addEventListener("input",()=>{
+        this.messageUserPrompt = promptTextarea.value;
+      });
+    }
     const button = panelBody.querySelector(`#${this.sendMessageButtonId}`) as HTMLButtonElement | null;
     if(!button) return;
     button.addEventListener("click",()=>this.onMessageSendButtonClick());
@@ -435,6 +443,18 @@ export class MessageThread{
         line-height: 1.4;
         white-space: pre-wrap;
         overflow-wrap: anywhere;
+      }
+      #${this.messagePanelId} .p-manager-user-prompt {
+        width: 100%;
+        min-height: 88px;
+        border: 1px solid #cbd5e1;
+        border-radius: 8px;
+        padding: 8px 10px;
+        font-size: 12px;
+        line-height: 1.5;
+        color: #0f172a;
+        background: #ffffff;
+        resize: vertical;
       }
       ${buildSendButtonCss(this.sendMessageButtonId,"#0d9488","#0f766e")}
     `;
@@ -603,6 +623,7 @@ export class MessageThread{
       url: this.id,
       title: this.title,
       data: this.threadItems,
+      userPrompt: this.messageUserPrompt,
     }).then((res: any)=>{
       if(res?.ok) return;
       this.isMessageLoading = false;

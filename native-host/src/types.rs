@@ -100,6 +100,7 @@ pub enum RequestFromChrome {
     #[serde(rename = "MATCH_MESSAGES")]
     MatchMessages {
         partner: PartnerRow,
+        user_prompt: String,
         messages: Vec<MessageRow>,
     },
     #[serde(rename = "MATCH_PROFILE")]

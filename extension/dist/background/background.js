@@ -154,6 +154,7 @@ var init_message_handler = __esm({
         const result = request;
         const partnerId = String(result.url ?? "");
         const items = Array.isArray(result.data) ? result.data : [];
+        const userPrompt = String(result.userPrompt ?? "\u6B21\u306E\u30E1\u30C3\u30BB\u30FC\u30B8\u3092\u4F5C\u6210\u3057\u3066\u304F\u3060\u3055\u3044");
         const updatedAt = (/* @__PURE__ */ new Date()).toISOString();
         const payload = {
           type: "MATCH_MESSAGES" /* MATCH_MESSAGES */,
@@ -161,6 +162,7 @@ var init_message_handler = __esm({
             id: partnerId,
             updated_at: updatedAt
           },
+          user_prompt: userPrompt,
           messages: items.map((item) => ({
             id: item.id,
             partner_id: partnerId,
